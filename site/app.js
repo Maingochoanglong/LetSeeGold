@@ -1,12 +1,10 @@
-import { CHI_PER_LUONG, CURRENCIES, SHOPS, collectAll, worldToVndPerLuong } from './sources.js';
+import { BROWSER_FETCHERS, CHI_PER_LUONG, CURRENCIES, SHOPS, collectAll, worldToVndPerLuong } from './sources.js';
 import { INTERVALS, MODES, describeRun, isTime, nextRun, normalizeTimes } from './schedule.js';
 import { convert, parseAmount } from './convert.js';
 
 const DATA_URL = 'data/latest.json';
 const SETTINGS_KEY = 'letseegold:settings:v1';
 const PRICES_KEY = 'letseegold:prices:v1';
-// Shops whose own APIs allow the browser to read them directly (CORS).
-const LIVE_SHOPS = SHOPS.filter((s) => s.browser).map((s) => s.id);
 const TICK_MS = 20_000;
 
 const DEFAULTS = {
@@ -175,7 +173,7 @@ function refresh(reason) {
         (s) => ({ s }),
         (e) => ({ e }),
       ),
-      collectAll({ only: LIVE_SHOPS, includeFx: false }).catch(() => null),
+      collectAll({ fetchers: BROWSER_FETCHERS, includeFx: false }).catch(() => null),
     ]);
     if (snap.s) {
       state.snapshot = snap.s;
@@ -477,7 +475,8 @@ function renderConverter() {
 function renderSources() {
   const links = SHOPS.map((s) => `<a href="${esc(s.website)}" target="_blank" rel="noopener">${esc(s.name)}</a>`);
   $('#sources').innerHTML =
-    `Nguồn giá: ${links.join(', ')}; SJC, DOJI, Bảo Tín Minh Châu qua <a href="https://giavang.org" target="_blank" rel="noopener">giavang.org</a>. ` +
+    `Nguồn giá: ${links.join(', ')}. SJC lấy thẳng từ sjc.com.vn khi trình duyệt của bạn đọc được, nếu không thì dùng bảng giá SJC trên ` +
+    `<a href="https://giavang.org" target="_blank" rel="noopener">giavang.org</a>; DOJI, Bảo Tín Minh Châu cũng qua giavang.org. ` +
     `Tỉ giá: <a href="https://www.vietcombank.com.vn/vi-VN/KHCN/Cong-cu-Tien-ich/Ty-gia" target="_blank" rel="noopener">Vietcombank</a>. ` +
     `Giá thế giới: <a href="https://gold-api.com" target="_blank" rel="noopener">gold-api.com</a>.` +
     (state.snapshot?.generatedAt ? ` Máy chủ tổng hợp lúc ${fmtTime(state.snapshot.generatedAt)}.` : '');

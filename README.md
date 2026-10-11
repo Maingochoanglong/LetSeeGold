@@ -52,7 +52,7 @@ GitHub Actions (≈10 phút/lần)                       Trình duyệt người
 └──────────────────────────────┘                    └──────────────────────────────┘
 ```
 
-- PNJ, Mi Hồng và giá thế giới cho phép trình duyệt đọc trực tiếp. Vì vậy, đến giờ người dùng đã hẹn, trang lấy **giá mới nhất ngay lúc đó** từ các nguồn này.
+- PNJ, Mi Hồng và giá thế giới cho phép trình duyệt đọc trực tiếp. Vì vậy, đến giờ người dùng đã hẹn, trang lấy **giá mới nhất ngay lúc đó** từ các nguồn này. Trang cũng thử đọc thẳng giá SJC từ sjc.com.vn.
 - Các nguồn còn lại được GitHub Actions lấy về khoảng 10 phút một lần.
 - Nếu một nguồn tạm lỗi, trang vẫn hiển thị giá lấy được gần nhất (trong vòng 3 ngày), gắn nhãn "Dữ liệu cũ".
 
@@ -61,13 +61,16 @@ GitHub Actions (≈10 phút/lần)                       Trình duyệt người
 | PNJ | API của PNJ (`edge-api.pnj.io`) |
 | Mi Hồng | API của Mi Hồng (`api.mihong.vn`) |
 | Phú Quý | Bảng giá trên `phuquygroup.vn` |
-| SJC | Bảng giá SJC tổng hợp trên `giavang.org`. Dự phòng: dữ liệu giá vàng của VnExpress |
+| SJC | Dịch vụ giá của SJC (`sjc.com.vn`). Nếu không đọc được thì dùng bảng giá SJC trên `giavang.org`, sau đó tới dữ liệu giá vàng của VnExpress |
 | DOJI | Bảng giá DOJI trên `giavang.org` |
 | Bảo Tín Minh Châu | Bảng giá BTMC trên `giavang.org` |
 | Tỉ giá | Vietcombank. Dự phòng: `open.er-api.com` (tỉ giá trung bình) |
 | Giá thế giới | `gold-api.com` |
 
-Website của SJC, DOJI và Bảo Tín Minh Châu chặn truy cập từ máy chủ ở nước ngoài, trong đó có GitHub. Vì vậy giá của ba đơn vị này được lấy qua trang tổng hợp giavang.org.
+Website của SJC, DOJI và Bảo Tín Minh Châu chặn truy cập từ ngoài Việt Nam, trong đó có máy chủ GitHub. Vì vậy:
+
+- **SJC:** trình duyệt của người xem ở Việt Nam gọi thẳng `sjc.com.vn`. Nếu đọc được, thẻ SJC hiện nhãn "Trực tiếp" và ghi "nguồn sjc.com.vn". Nếu SJC không cho trang khác đọc dữ liệu, hoặc người xem ở nước ngoài, trang dùng bảng giá SJC mà máy chủ lấy qua giavang.org.
+- **DOJI, Bảo Tín Minh Châu:** lấy qua trang tổng hợp giavang.org.
 
 ## Lưu ý
 

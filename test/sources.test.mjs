@@ -9,6 +9,7 @@ import {
   parseNum,
   parsePhuquy,
   parsePnj,
+  parseSjc,
   parseVcbJson,
   parseVcbXml,
   parseWorldGold,
@@ -160,4 +161,26 @@ test('VnExpress SJC fallback', () => {
   assert.equal(r.items[0].buy, 141_800_000);
   assert.equal(r.items[0].sell, 144_800_000);
   assert.throws(() => parseVnexpressSjc({ data: {} }));
+});
+
+test('sjc.com.vn: first branch, VND per lượng', () => {
+  // Built from the price service's field names: sjc.com.vn refuses requests
+  // from outside Vietnam, so no live response could be captured for it.
+  const r = parseSjc(json('sjc.json'));
+  assert.equal(r.via, 'sjc.com.vn');
+  assert.equal(r.region, 'Hồ Chí Minh');
+  assert.equal(r.sourceTime, '2026-10-11T03:18:00.000Z');
+  assert.equal(r.items.length, 3);
+  assert.deepEqual(
+    { key: r.items[0].key, buy: r.items[0].buy, sell: r.items[0].sell },
+    { key: 'sjc:vang-sjc-1l-10l-1kg', buy: 141_800_000, sell: 144_800_000 },
+  );
+  // Falls back to the thousand-VND text when the numeric value is missing.
+  assert.equal(r.items[2].buy, 141_300_000);
+  assert.equal(r.items[2].sell, 144_300_000);
+  // Same keys as the giavang.org mirror, so ▲▼ keeps working when the source switches.
+  const mirror = parseGiavangOrg(fixture('giavang-sjc.html'), 'sjc');
+  assert.equal(mirror.items[0].key, r.items[0].key);
+  assert.throws(() => parseSjc({ success: false }));
+  assert.throws(() => parseSjc({ data: [] }));
 });

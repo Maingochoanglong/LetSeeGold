@@ -22,14 +22,12 @@ export const SHOPS = [
     name: 'PNJ',
     fullName: 'Vàng bạc Đá quý Phú Nhuận',
     website: 'https://www.pnj.com.vn/site/gia-vang',
-    browser: true,
   },
   {
     id: 'mihong',
     name: 'Mi Hồng',
     fullName: 'Tiệm vàng Mi Hồng (TP.HCM)',
     website: 'https://www.mihong.vn/vi/gia-vang-trong-nuoc',
-    browser: true,
   },
   {
     id: 'doji',
@@ -58,6 +56,7 @@ export const CURRENCIES = [
 ];
 
 export const URLS = {
+  sjc: 'https://sjc.com.vn/GoldPrice/Services/PriceService.ashx',
   pnj: 'https://edge-api.pnj.io/ecom-frontend/v1/get-gold-price?zone=00',
   mihong: 'https://api.mihong.vn/v1/gold-prices?market=domestic',
   vcbXml: 'https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx',
@@ -245,6 +244,31 @@ export function parsePhuquy(html) {
   }
   const updated = /cập nhật lần cuối[^<]*/i.exec(decodeEntities(html))?.[0];
   return { items: ensureItems(items, 'Phú Quý'), sourceTime: vnDateTime(updated) };
+}
+
+/**
+ * SJC's own price service (sjc.com.vn). It only answers visitors in Vietnam,
+ * so the scheduled build abroad gets a Cloudflare block page and falls back to
+ * the mirrors below; a visitor's browser in Vietnam can read it directly.
+ * Values are VND per lượng ("BuyValue"); the text fields are thousand VND.
+ */
+export function parseSjc(json) {
+  if (json?.success === false) throw new Error('sjc.com.vn trả về lỗi');
+  const rows = Array.isArray(json?.data) ? json.data : [];
+  const branch = rows.find((r) => r?.BranchName)?.BranchName ?? null;
+  const vnd = (value, text) => {
+    const n = parseNum(value) || parseNum(text); // 0 means "not given"
+    return n && n < 1e6 ? n * 1000 : n;
+  };
+  const items = rows
+    .filter((r) => !branch || r.BranchName === branch)
+    .map((r) => item('sjc', null, String(r.TypeName ?? r.Name ?? ''), vnd(r.BuyValue, r.Buy), vnd(r.SellValue, r.Sell)));
+  return {
+    items: ensureItems(items, 'sjc.com.vn'),
+    sourceTime: vnDateTime(json?.latestDate),
+    region: branch,
+    via: 'sjc.com.vn',
+  };
 }
 
 /**
@@ -442,9 +466,15 @@ async function firstOk(attempts) {
   throw new Error(errors.join('; '));
 }
 
+async function fetchSjc() {
+  const body = new URLSearchParams({ method: 'GetCurrentGoldPricesByBranch', BranchId: '1' });
+  return parseSjc(await get(URLS.sjc, { init: { method: 'POST', body } }));
+}
+
 export const GOLD_FETCHERS = {
   sjc: () =>
     firstOk([
+      fetchSjc,
       async () => parseGiavangOrg(await get(URLS.giavangOrg('sjc'), { type: 'text' }), 'sjc'),
       async () => parseVnexpressSjc(await get(URLS.vnexpress)),
     ]),
@@ -454,6 +484,18 @@ export const GOLD_FETCHERS = {
   btmc: async () =>
     parseGiavangOrg(await get(URLS.giavangOrg('bao-tin-minh-chau'), { type: 'text' }), 'btmc', { groups: 'all' }),
   phuquy: async () => parsePhuquy(await get(URLS.phuquy, { type: 'text' })),
+};
+
+/**
+ * Sources the page reads by itself at the user's scheduled times, straight
+ * from the shop. PNJ and Mi Hồng allow cross-origin reads; SJC is tried too
+ * (it only answers visitors in Vietnam). When one fails the page keeps the
+ * copy from the scheduled build.
+ */
+export const BROWSER_FETCHERS = {
+  sjc: fetchSjc,
+  pnj: GOLD_FETCHERS.pnj,
+  mihong: GOLD_FETCHERS.mihong,
 };
 
 /** Exchange rates: Vietcombank first, then a mid-market fallback. */
@@ -480,14 +522,11 @@ export async function settle(run) {
   }
 }
 
-/**
- * Fetches everything. `only` limits gold shops (the browser only refreshes the
- * shops whose APIs allow cross-origin requests).
- */
-export async function collectAll({ only, includeFx = true, includeWorld = true } = {}) {
-  const ids = SHOPS.map((s) => s.id).filter((id) => GOLD_FETCHERS[id] && (!only || only.includes(id)));
+/** Fetches every shop in `fetchers`, plus exchange rates and the world price. */
+export async function collectAll({ fetchers = GOLD_FETCHERS, includeFx = true, includeWorld = true } = {}) {
+  const ids = SHOPS.map((s) => s.id).filter((id) => fetchers[id]);
   const [goldResults, fx, world] = await Promise.all([
-    Promise.all(ids.map((id) => settle(GOLD_FETCHERS[id]))),
+    Promise.all(ids.map((id) => settle(fetchers[id]))),
     includeFx ? settle(fetchFx) : null,
     includeWorld ? settle(fetchWorldGold) : null,
   ]);
