@@ -1,0 +1,63 @@
+# Lấy giá vàng & tỉ giá mới nhất rồi đăng trang lên GitHub Pages.
+# Miễn phí hoàn toàn với repository công khai (public).
+name: Cập nhật giá & triển khai
+
+on:
+  schedule:
+    # Khoảng mỗi 10 phút (giờ UTC). Tránh phút 0 vì GitHub hay trễ lịch vào đầu giờ.
+    - cron: '3,13,23,33,43,53 * * * *'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm test
+      - run: npm run build
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
+
+  keepalive:
+    # GitHub tự tắt lịch chạy sau 60 ngày repository không có hoạt động.
+    # Mỗi ngày một lần, bật lại workflow này để bộ đếm không chạm mốc đó.
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Giữ lịch chạy luôn bật
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$(date -u +%H)" = "01" ] && [ "$(date -u +%M)" -lt 10 ]; then
+            gh api -X PUT "repos/${{ github.repository }}/actions/workflows/deploy.yml/enable"
+            echo "Đã làm mới trạng thái workflow."
+          fi

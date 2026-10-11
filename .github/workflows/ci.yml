@@ -1,0 +1,24 @@
+name: Kiểm tra
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm test
+      # Lấy giá thật từ mọi nguồn để phát hiện sớm khi một cửa hàng đổi website.
+      - name: Lấy giá thật
+        run: npm run build
+      - name: Tóm tắt dữ liệu
+        run: node scripts/summary.mjs dist/data/latest.json >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,16 @@
+{
+  "name": "letseegold",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Giá vàng (SJC, PNJ, Mi Hồng, DOJI, Bảo Tín Minh Châu, Phú Quý) và tỉ giá USD/JPY/KRW – trang tĩnh miễn phí trên GitHub Pages.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/serve.mjs dist"
+  },
+  "license": "Apache-2.0"
+}
