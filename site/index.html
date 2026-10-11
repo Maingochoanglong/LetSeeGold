@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>LetSeeGold – Giá vàng & tỉ giá hôm nay</title>
+  <meta name="description" content="Giá vàng mua vào, bán ra tại SJC, PNJ, DOJI, Mi Hồng, Bảo Tín Minh Châu và tỉ giá USD, JPY, KRW. Tự cập nhật theo khung giờ bạn chọn.">
+  <meta name="theme-color" content="#a8820f">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="./" aria-label="LetSeeGold – trang chủ">
+        <img src="icon.svg" alt="" width="32" height="32">
+        <span>LetSee<b>Gold</b></span>
+      </a>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost" id="btn-refresh" type="button" title="Cập nhật ngay">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+          <span class="hide-sm">Cập nhật</span>
+        </button>
+        <button class="btn btn-primary" id="btn-settings" type="button" title="Cài đặt lịch cập nhật">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
+          <span class="hide-sm">Lịch cập nhật</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="status" aria-live="polite">
+      <div class="status-line">
+        <span class="dot" id="status-dot"></span>
+        <span id="status-text">Đang tải dữ liệu…</span>
+      </div>
+      <div class="status-line muted" id="schedule-text"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="gold-title">
+      <div class="panel-head">
+        <h1 id="gold-title">Giá vàng hôm nay</h1>
+        <div class="seg" role="radiogroup" aria-label="Đơn vị">
+          <button type="button" role="radio" data-unit="luong" aria-checked="true">đ/lượng</button>
+          <button type="button" role="radio" data-unit="chi" aria-checked="false">đ/chỉ</button>
+        </div>
+      </div>
+      <div class="chips" id="shop-tabs" role="tablist" aria-label="Chọn cửa hàng"></div>
+      <div id="world-gold" class="world" hidden></div>
+      <div id="compare" class="compare" hidden></div>
+      <p class="muted small ref-note" id="ref-note" hidden></p>
+      <div class="shops" id="shops">
+        <div class="skeleton"></div><div class="skeleton"></div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="fx-title">
+      <div class="panel-head">
+        <h2 id="fx-title">Tỉ giá ngoại tệ</h2>
+        <span class="muted small" id="fx-source"></span>
+      </div>
+      <div class="table-wrap">
+        <table class="table fx-table">
+          <thead>
+            <tr><th>Ngoại tệ</th><th class="num">Mua tiền mặt</th><th class="num">Mua chuyển khoản</th><th class="num">Bán ra</th></tr>
+          </thead>
+          <tbody id="fx-body"></tbody>
+        </table>
+      </div>
+
+      <div class="converter" id="converter">
+        <h3>Quy đổi tiền tệ</h3>
+        <div class="conv-row">
+          <label class="field">
+            <span>Số tiền</span>
+            <input id="conv-amount" type="text" inputmode="decimal" autocomplete="off" value="100">
+          </label>
+          <label class="field">
+            <span>Từ</span>
+            <select id="conv-from"></select>
+          </label>
+          <button class="btn btn-ghost swap" id="conv-swap" type="button" title="Đổi chiều" aria-label="Đổi chiều quy đổi">⇄</button>
+          <label class="field">
+            <span>Sang</span>
+            <select id="conv-to"></select>
+          </label>
+        </div>
+        <div class="conv-result" id="conv-result"></div>
+        <div class="conv-all" id="conv-all"></div>
+        <p class="muted small" id="conv-note"></p>
+      </div>
+    </section>
+
+    <footer class="footer muted small">
+      <p>Giá được tự động lấy từ website chính thức của từng đơn vị và chỉ mang tính tham khảo. Vui lòng liên hệ cửa hàng để biết giá giao dịch chính xác.</p>
+      <p id="sources"></p>
+    </footer>
+  </main>
+
+  <dialog id="settings" class="dialog">
+    <form method="dialog" id="settings-form">
+      <header class="dialog-head">
+        <h2>Lịch cập nhật giá</h2>
+        <button class="btn btn-ghost icon" value="cancel" aria-label="Đóng">✕</button>
+      </header>
+
+      <fieldset>
+        <legend>Chế độ</legend>
+        <label class="radio"><input type="radio" name="mode" value="times"> <span><b>Theo giờ cố định</b><small>Cập nhật vào đúng các giờ bạn chọn mỗi ngày</small></span></label>
+        <label class="radio"><input type="radio" name="mode" value="interval"> <span><b>Định kỳ trong khung giờ</b><small>Cập nhật lặp lại trong một khoảng thời gian</small></span></label>
+        <label class="radio"><input type="radio" name="mode" value="manual"> <span><b>Thủ công</b><small>Chỉ cập nhật khi bấm nút “Cập nhật”</small></span></label>
+      </fieldset>
+
+      <fieldset data-mode="times">
+        <legend>Các giờ cập nhật</legend>
+        <div class="time-list" id="time-list"></div>
+        <div class="time-add">
+          <input type="time" id="time-new" value="09:00" aria-label="Giờ mới">
+          <button type="button" class="btn btn-ghost" id="time-add">+ Thêm giờ</button>
+        </div>
+      </fieldset>
+
+      <fieldset data-mode="interval">
+        <legend>Định kỳ</legend>
+        <div class="grid-3">
+          <label class="field"><span>Mỗi</span>
+            <select name="every">
+              <option value="5">5 phút</option>
+              <option value="10">10 phút</option>
+              <option value="15">15 phút</option>
+              <option value="30">30 phút</option>
+              <option value="60">1 giờ</option>
+              <option value="120">2 giờ</option>
+            </select>
+          </label>
+          <label class="field"><span>Từ</span><input type="time" name="from"></label>
+          <label class="field"><span>Đến</span><input type="time" name="to"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Thông báo</legend>
+        <label class="check"><input type="checkbox" name="notify"> Hiện thông báo khi đến giờ cập nhật</label>
+        <label class="check"><input type="checkbox" name="notifyOnlyChange"> Chỉ thông báo khi giá thay đổi</label>
+        <p class="muted small">Lịch chạy khi trang (hoặc ứng dụng đã cài lên màn hình chính) đang mở. Dữ liệu trên máy chủ được làm mới khoảng mỗi 10 phút.</p>
+      </fieldset>
+
+      <footer class="dialog-foot">
+        <button class="btn btn-ghost" value="cancel">Huỷ</button>
+        <button class="btn btn-primary" value="save" id="settings-save">Lưu</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "LetSeeGold – Giá vàng & tỉ giá",
+  "short_name": "LetSeeGold",
+  "description": "Giá vàng mua vào, bán ra tại SJC, PNJ, Mi Hồng, DOJI, Bảo Tín Minh Châu, Phú Quý và tỉ giá USD, JPY, KRW.",
+  "lang": "vi",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f4ec",
+  "theme_color": "#a8820f",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
