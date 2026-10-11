@@ -31,10 +31,11 @@ Không cần máy chủ riêng, cơ sở dữ liệu hay thẻ thanh toán. Repo
 
 ## Kích hoạt (làm một lần)
 
-1. Gộp (merge) Pull Request này vào nhánh `main`.
-2. Vào **Settings → Pages**. Ở mục *Build and deployment → Source*, chọn **GitHub Actions**.
-3. Vào tab **Actions**, chọn workflow **"Cập nhật giá & triển khai"** rồi bấm **Run workflow**.
-4. Chờ khoảng 1 phút, sau đó mở https://maingochoanglong.github.io/LetSeeGold/
+1. Vào **Settings → Pages**. Ở mục *Build and deployment → Source*, chọn **GitHub Actions**.
+2. Gộp (merge) Pull Request này vào nhánh `main`. Workflow **"Cập nhật giá & triển khai"** sẽ tự chạy.
+3. Chờ khoảng 1 phút rồi mở https://maingochoanglong.github.io/LetSeeGold/
+
+Nếu lần chạy đầu bị lỗi vì Pages chưa được bật, hãy bật Pages như bước 1. Sau đó vào tab **Actions**, chọn **"Cập nhật giá & triển khai"** và bấm **Run workflow**.
 
 Từ đó GitHub tự lấy giá mới khoảng mỗi 10 phút và đăng lại trang.
 
