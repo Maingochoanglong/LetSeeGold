@@ -6,8 +6,13 @@ Trang web xem **giá vàng mua vào / bán ra** tại các cửa hàng uy tín v
 
 ## Tính năng
 
-- **Giá vàng miếng SJC tại các cửa hàng** đặt ngay đầu trang, có thể chuyển sang nhẫn trơn 9999. Mỗi dòng ghi rõ lấy từ website chính hãng hay qua trang tổng hợp, kèm giờ niêm yết. Tiệm mua vào cao nhất và bán ra thấp nhất được tô nổi bật.
-- **Bảng giá đầy đủ của 8 cửa hàng:** PNJ, Mi Hồng, Bảo Tín Mạnh Hải, Phú Quý, Ngọc Thẩm, DOJI, Bảo Tín Minh Châu, SJC. Mỗi dòng có giá mua vào, bán ra và mức tăng/giảm (▲▼) so với cuối ngày hôm trước.
+- **Giá vàng miếng SJC tại các cửa hàng** là màn hình chính: PNJ, Mi Hồng, Bảo Tín Mạnh Hải, Phú Quý, Ngọc Thẩm, DOJI, Bảo Tín Minh Châu, SJC. Mỗi dòng có:
+  - giá mua vào, bán ra và mức tăng/giảm (▲▼) so với cuối ngày hôm trước;
+  - nguồn: website chính hãng hay qua trang tổng hợp;
+  - giờ cửa hàng niêm yết.
+
+  Tiệm mua vào cao nhất và bán ra thấp nhất được tô nổi bật. Có thể chuyển sang so sánh nhẫn trơn 9999.
+- **Bảng giá đầy đủ của từng tiệm:** bấm tên tiệm để xem.
 - **Giá vàng thế giới** (USD/oz), quy đổi ra đ/lượng, kèm chênh lệch so với SJC.
 - **Đổi đơn vị** giữa đ/lượng và đ/chỉ.
 - **Tỉ giá Vietcombank** cho USD, JPY, KRW: mua tiền mặt, mua chuyển khoản, bán ra.

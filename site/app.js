@@ -250,7 +250,7 @@ function renderSchedule() {
 }
 
 function renderTabs() {
-  const tabs = [{ id: 'all', name: 'Tất cả' }, ...SHOPS];
+  const tabs = [{ id: 'all', name: 'So sánh giá' }, ...SHOPS];
   $('#shop-tabs').innerHTML = tabs
     .map((t) => {
       const s = t.id === 'all' ? null : state.view.gold[t.id];
@@ -294,6 +294,7 @@ function renderCompare() {
     return;
   }
   const c = COMPARE[settings.compare];
+  const ref = state.view.ref?.prices || {};
   const rows = SHOPS.map((s) => ({ shop: s, data: state.view.gold[s.id], item: pick(state.view.gold[s.id], c.match) })).filter(
     (r) => r.item,
   );
@@ -314,8 +315,8 @@ function renderCompare() {
             <td><button type="button" class="link" data-tab="${shop.id}">${esc(shop.name)}</button>
               <small class="muted product">${esc(item.name)}</small>
               <small class="src${data.via ? '' : ' official'}">${esc(source)}${time ? ` · ${time}` : ''}${data.stale ? ' · dữ liệu cũ' : ''}</small></td>
-            <td class="num${item.buy != null && item.buy === bestBuy ? ' best' : ''}" data-label="Mua">${fmtPrice(item.buy)}</td>
-            <td class="num${item.sell != null && item.sell === bestSell ? ' best' : ''}" data-label="Bán">${fmtPrice(item.sell)}</td>
+            <td class="num${item.buy != null && item.buy === bestBuy ? ' best' : ''}" data-label="Mua">${fmtPrice(item.buy)}${change(item.buy, ref[item.key]?.[0])}</td>
+            <td class="num${item.sell != null && item.sell === bestSell ? ' best' : ''}" data-label="Bán">${fmtPrice(item.sell)}${change(item.sell, ref[item.key]?.[1])}</td>
             <td class="num muted spread">${spread}</td>
           </tr>`;
         })
@@ -332,20 +333,23 @@ function renderCompare() {
         <tbody>${body}</tbody>
       </table>
     </div>
-    <p class="muted small">Đơn vị ${unitLabel()}. <span class="best-key">Ô nổi bật</span>: tiệm mua vào cao nhất / bán ra thấp nhất. Bấm tên cửa hàng để xem toàn bộ bảng giá.</p>`;
+    <p class="muted small">Đơn vị ${unitLabel()}.${refNote()} <span class="best-key">Ô nổi bật</span>: tiệm mua vào cao nhất / bán ra thấp nhất. Bấm tên cửa hàng để xem toàn bộ bảng giá của tiệm.</p>`;
   el.hidden = false;
 }
 
-function renderShops() {
+function refNote() {
   const ref = state.view.ref;
+  if (!ref) return '';
+  const [y, m, d] = ref.date.split('-');
+  return ` ▲▼ so với giá cuối ngày ${d}/${m}/${y}.`;
+}
+
+function renderShops() {
+  const shop = SHOPS.find((s) => s.id === settings.tab);
   const note = $('#ref-note');
-  note.hidden = !ref;
-  if (ref) {
-    const [y, m, d] = ref.date.split('-');
-    note.textContent = `▲▼ so với giá cuối ngày ${d}/${m}/${y}. Đơn vị: ${unitLabel()}.`;
-  }
-  const shops = settings.tab === 'all' ? SHOPS : SHOPS.filter((s) => s.id === settings.tab);
-  $('#shops').innerHTML = shops.map((shop) => renderShop(shop, state.view.gold[shop.id], ref?.prices || {})).join('');
+  note.hidden = !shop || !state.view.ref;
+  note.textContent = `${refNote().trim()} Đơn vị: ${unitLabel()}.`;
+  $('#shops').innerHTML = shop ? renderShop(shop, state.view.gold[shop.id], state.view.ref?.prices || {}) : '';
 }
 
 function renderShop(shop, data, refPrices) {
