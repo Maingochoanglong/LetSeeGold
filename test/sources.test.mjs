@@ -2,6 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
+  decodeTurboStream,
+  parseBtmh,
+  parseNgocTham,
   parseErApi,
   parseGiavangOrg,
   parseVnexpressSjc,
@@ -160,4 +163,34 @@ test('VnExpress SJC fallback', () => {
   assert.equal(r.items[0].buy, 141_800_000);
   assert.equal(r.items[0].sell, 144_800_000);
   assert.throws(() => parseVnexpressSjc({ data: {} }));
+});
+
+test('turbo-stream decoding: shared values and special indexes', () => {
+  const text = JSON.stringify([{ _1: 2, _3: 4 }, 'a', 'shared', 'b', [2, 2, -5, 5], 7]);
+  assert.deepEqual(decodeTurboStream(text), { a: 'shared', b: ['shared', 'shared', null, 7] });
+});
+
+test('Bảo Tín Mạnh Hải: route data, per-row units, no silver', () => {
+  const { items, sourceTime } = parseBtmh(fixture('btmh.data'));
+  assert.equal(sourceTime, '2026-10-09T10:49:21.000Z');
+  assert.ok(items.every((i) => !/bạc|ngân gia bảo/i.test(i.name)), 'silver rows are skipped');
+  const sjc = byKey(items, 'btmh:SJC9999');
+  assert.equal(sjc.name, 'Vàng miếng SJC (Cty CP BTMH)');
+  assert.equal(sjc.buy, 141_800_000);
+  assert.equal(sjc.sell, 144_800_000);
+  // Priced per 0,1 chỉ on the site.
+  assert.equal(byKey(items, 'btmh:BT-TKC').buy, 139_800_000);
+  // The site writes 1 in the sell column of buy-only rows.
+  assert.equal(byKey(items, 'btmh:NL9999').sell, null);
+  assert.equal(items.length, 9);
+});
+
+test('Ngọc Thẩm: price table, VND per chỉ', () => {
+  const { items, sourceTime } = parseNgocTham(fixture('ngoctham.html'));
+  assert.equal(sourceTime, '2026-10-11T00:30:00.000Z');
+  assert.equal(items.length, 6);
+  const sjc = items.find((i) => /SJC/.test(i.name));
+  assert.deepEqual({ name: sjc.name, buy: sjc.buy, sell: sjc.sell }, { name: 'Vàng Miếng SJC (Loại 10 chỉ)', buy: 140_000_000, sell: 143_500_000 });
+  assert.equal(items[0].name, 'Nhẫn Trơn 24K');
+  assert.throws(() => parseNgocTham('<html>Bảo trì</html>'));
 });

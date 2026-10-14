@@ -6,8 +6,8 @@ Trang web xem **giá vàng mua vào / bán ra** tại các cửa hàng uy tín v
 
 ## Tính năng
 
-- **Giá vàng 6 cửa hàng:** SJC, PNJ, Mi Hồng, DOJI, Bảo Tín Minh Châu, Phú Quý. Mỗi dòng có giá mua vào, bán ra và mức tăng/giảm (▲▼) so với cuối ngày hôm trước.
-- **So sánh nhanh** giá vàng miếng SJC và nhẫn trơn 9999 giữa các tiệm. Tiệm mua vào cao nhất và bán ra thấp nhất được tô nổi bật.
+- **Giá vàng miếng SJC tại các cửa hàng** đặt ngay đầu trang, có thể chuyển sang nhẫn trơn 9999. Mỗi dòng ghi rõ lấy từ website chính hãng hay qua trang tổng hợp, kèm giờ niêm yết. Tiệm mua vào cao nhất và bán ra thấp nhất được tô nổi bật.
+- **Bảng giá đầy đủ của 8 cửa hàng:** PNJ, Mi Hồng, Bảo Tín Mạnh Hải, Phú Quý, Ngọc Thẩm, DOJI, Bảo Tín Minh Châu, SJC. Mỗi dòng có giá mua vào, bán ra và mức tăng/giảm (▲▼) so với cuối ngày hôm trước.
 - **Giá vàng thế giới** (USD/oz), quy đổi ra đ/lượng, kèm chênh lệch so với SJC.
 - **Đổi đơn vị** giữa đ/lượng và đ/chỉ.
 - **Tỉ giá Vietcombank** cho USD, JPY, KRW: mua tiền mặt, mua chuyển khoản, bán ra.
@@ -58,16 +58,18 @@ GitHub Actions (≈10 phút/lần)                       Trình duyệt người
 
 | Cửa hàng | Nguồn |
 |---|---|
-| PNJ | API của PNJ (`edge-api.pnj.io`) |
-| Mi Hồng | API của Mi Hồng (`api.mihong.vn`) |
+| PNJ | API trên website PNJ (`edge-api.pnj.io`) |
+| Mi Hồng | API trên website Mi Hồng (`api.mihong.vn`) |
+| Bảo Tín Mạnh Hải | Trang bảng giá `baotinmanhhai.vn/bang-gia-vang` |
 | Phú Quý | Bảng giá trên `phuquygroup.vn` |
-| SJC | Bảng giá SJC tổng hợp trên `giavang.org`. Dự phòng: dữ liệu giá vàng của VnExpress |
+| Ngọc Thẩm | Bảng giá trên `ngoctham.com/bang-gia-vang` |
 | DOJI | Bảng giá DOJI trên `giavang.org` |
 | Bảo Tín Minh Châu | Bảng giá BTMC trên `giavang.org` |
+| SJC | Bảng giá SJC trên `giavang.org`. Dự phòng: dữ liệu giá vàng của VnExpress |
 | Tỉ giá | Vietcombank. Dự phòng: `open.er-api.com` (tỉ giá trung bình) |
 | Giá thế giới | `gold-api.com` |
 
-Website của SJC, DOJI và Bảo Tín Minh Châu chặn truy cập từ máy chủ ở nước ngoài, trong đó có GitHub. Vì vậy giá của ba đơn vị này được lấy qua trang tổng hợp giavang.org.
+Website của DOJI, Bảo Tín Minh Châu và SJC chặn truy cập từ ngoài Việt Nam, trong đó có máy chủ GitHub. Vì vậy giá của ba đơn vị này được lấy qua trang tổng hợp giavang.org, và trang ghi rõ "qua giavang.org" ở những dòng đó.
 
 ## Lưu ý
 

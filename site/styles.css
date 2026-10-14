@@ -143,6 +143,8 @@ h3 { font-size: 1.02rem; }
 .compare-head h2 { font-size: 1.02rem; }
 .compare .table th, .compare .table td { border-bottom-color: var(--border); }
 .compare .table td small { display: block; font-size: 0.75rem; }
+.compare .table td small.src { color: var(--muted); }
+.compare .table td small.src.official { color: var(--up); }
 .compare .table td.best, .best-key { color: var(--up); background: color-mix(in srgb, var(--up) 10%, transparent); }
 .best-key { padding: 1px 6px; border-radius: 6px; font-weight: 600; }
 .compare p { margin: 8px 0 0; }
@@ -272,7 +274,7 @@ tr.flash td { animation: flash 2.4s ease-out; }
   .panel { padding: 12px; border-radius: 12px; }
   .table { font-size: 0.9rem; }
   .table th, .table td { padding: 8px; }
-  .compare .table td small { display: none; }
+  .compare .table td small.product { display: none; }
   .conv-row { grid-template-columns: 1fr auto 1fr; }
   .conv-row .field:first-child { grid-column: 1 / -1; }
   .grid-3 { grid-template-columns: 1fr 1fr; }

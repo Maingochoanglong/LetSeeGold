@@ -1,12 +1,10 @@
-import { CHI_PER_LUONG, CURRENCIES, SHOPS, collectAll, worldToVndPerLuong } from './sources.js';
+import { BROWSER_FETCHERS, CHI_PER_LUONG, CURRENCIES, SHOPS, collectAll, worldToVndPerLuong } from './sources.js';
 import { INTERVALS, MODES, describeRun, isTime, nextRun, normalizeTimes } from './schedule.js';
 import { convert, parseAmount } from './convert.js';
 
 const DATA_URL = 'data/latest.json';
 const SETTINGS_KEY = 'letseegold:settings:v1';
 const PRICES_KEY = 'letseegold:prices:v1';
-// Shops whose own APIs allow the browser to read them directly (CORS).
-const LIVE_SHOPS = SHOPS.filter((s) => s.browser).map((s) => s.id);
 const TICK_MS = 20_000;
 
 const DEFAULTS = {
@@ -24,8 +22,12 @@ const DEFAULTS = {
 };
 
 const COMPARE = {
-  sjc: { label: 'Vàng miếng SJC', match: (n) => /SJC/i.test(n) && !/nhẫn|nữ trang|trang sức/i.test(n) },
-  ring: { label: 'Nhẫn trơn 9999', match: (n) => /nhẫn/i.test(n) },
+  sjc: {
+    label: 'Vàng miếng SJC',
+    title: 'Giá vàng miếng SJC tại các cửa hàng',
+    match: (n) => /SJC/i.test(n) && !/nhẫn|nữ trang|trang sức/i.test(n),
+  },
+  ring: { label: 'Nhẫn trơn 9999', title: 'Giá nhẫn trơn 9999 tại các cửa hàng', match: (n) => /nhẫn/i.test(n) },
 };
 
 // ---------------------------------------------------------------------------
@@ -175,7 +177,7 @@ function refresh(reason) {
         (s) => ({ s }),
         (e) => ({ e }),
       ),
-      collectAll({ only: LIVE_SHOPS, includeFx: false }).catch(() => null),
+      collectAll({ fetchers: BROWSER_FETCHERS, includeFx: false }).catch(() => null),
     ]);
     if (snap.s) {
       state.snapshot = snap.s;
@@ -292,7 +294,9 @@ function renderCompare() {
     return;
   }
   const c = COMPARE[settings.compare];
-  const rows = SHOPS.map((s) => ({ shop: s, item: pick(state.view.gold[s.id], c.match) })).filter((r) => r.item);
+  const rows = SHOPS.map((s) => ({ shop: s, data: state.view.gold[s.id], item: pick(state.view.gold[s.id], c.match) })).filter(
+    (r) => r.item,
+  );
   const buys = rows.map((r) => r.item.buy).filter((v) => v != null);
   const sells = rows.map((r) => r.item.sell).filter((v) => v != null);
   const bestBuy = buys.length > 1 ? Math.max(...buys) : null;
@@ -302,10 +306,14 @@ function renderCompare() {
     .join('');
   const body = rows.length
     ? rows
-        .map(({ shop, item }) => {
+        .map(({ shop, data, item }) => {
           const spread = item.buy != null && item.sell != null ? fmtPrice(item.sell - item.buy) : '—';
+          const source = data.via ? `qua ${data.via}` : 'website chính hãng';
+          const time = fmtTime(data.sourceTime || data.fetchedAt);
           return `<tr>
-            <td><button type="button" class="link" data-tab="${shop.id}">${esc(shop.name)}</button><small class="muted">${esc(item.name)}</small></td>
+            <td><button type="button" class="link" data-tab="${shop.id}">${esc(shop.name)}</button>
+              <small class="muted product">${esc(item.name)}</small>
+              <small class="src${data.via ? '' : ' official'}">${esc(source)}${time ? ` · ${time}` : ''}${data.stale ? ' · dữ liệu cũ' : ''}</small></td>
             <td class="num${item.buy != null && item.buy === bestBuy ? ' best' : ''}" data-label="Mua">${fmtPrice(item.buy)}</td>
             <td class="num${item.sell != null && item.sell === bestSell ? ' best' : ''}" data-label="Bán">${fmtPrice(item.sell)}</td>
             <td class="num muted spread">${spread}</td>
@@ -315,7 +323,7 @@ function renderCompare() {
     : '<tr><td colspan="4" class="muted">Chưa có dữ liệu.</td></tr>';
   el.innerHTML = `
     <div class="compare-head">
-      <h2>So sánh nhanh</h2>
+      <h2>${c.title}</h2>
       <div class="seg" role="radiogroup" aria-label="Loại vàng so sánh">${seg}</div>
     </div>
     <div class="table-wrap">
@@ -324,7 +332,7 @@ function renderCompare() {
         <tbody>${body}</tbody>
       </table>
     </div>
-    <p class="muted small">Đơn vị ${unitLabel()}. <span class="best-key">Ô nổi bật</span>: tiệm mua vào cao nhất / bán ra thấp nhất.</p>`;
+    <p class="muted small">Đơn vị ${unitLabel()}. <span class="best-key">Ô nổi bật</span>: tiệm mua vào cao nhất / bán ra thấp nhất. Bấm tên cửa hàng để xem toàn bộ bảng giá.</p>`;
   el.hidden = false;
 }
 
@@ -477,7 +485,8 @@ function renderConverter() {
 function renderSources() {
   const links = SHOPS.map((s) => `<a href="${esc(s.website)}" target="_blank" rel="noopener">${esc(s.name)}</a>`);
   $('#sources').innerHTML =
-    `Nguồn giá: ${links.join(', ')}; SJC, DOJI, Bảo Tín Minh Châu qua <a href="https://giavang.org" target="_blank" rel="noopener">giavang.org</a>. ` +
+    `Nguồn giá: ${links.join(', ')}. DOJI, Bảo Tín Minh Châu và SJC chặn truy cập từ nước ngoài nên được lấy qua ` +
+    `<a href="https://giavang.org" target="_blank" rel="noopener">giavang.org</a>. ` +
     `Tỉ giá: <a href="https://www.vietcombank.com.vn/vi-VN/KHCN/Cong-cu-Tien-ich/Ty-gia" target="_blank" rel="noopener">Vietcombank</a>. ` +
     `Giá thế giới: <a href="https://gold-api.com" target="_blank" rel="noopener">gold-api.com</a>.` +
     (state.snapshot?.generatedAt ? ` Máy chủ tổng hợp lúc ${fmtTime(state.snapshot.generatedAt)}.` : '');
