@@ -1,6 +1,5 @@
-import { BROWSER_FETCHERS, CHI_PER_LUONG, CURRENCIES, SHOPS, collectAll, vnDate } from './sources.js';
+import { BROWSER_FETCHERS, CHI_PER_LUONG, SHOPS, collectAll, vnDate } from './sources.js';
 import { INTERVALS, MODES, describeRun, isTime, nextRun, normalizeTimes } from './schedule.js';
-import { convert, parseAmount } from './convert.js';
 
 const DATA_URL = 'data/latest.json';
 const BASE_TITLE = document.title;
@@ -18,7 +17,6 @@ const DEFAULTS = {
   notify: false,
   notifyOnlyChange: false,
   unit: 'luong',
-  conv: { amount: '100', from: 'USD', to: 'VND' },
 };
 
 // The page shows one product per shop: its SJC gold bar.
@@ -53,10 +51,6 @@ function sanitize(raw) {
   s.notify = Boolean(s.notify);
   s.notifyOnlyChange = Boolean(s.notifyOnlyChange);
   if (!['luong', 'chi'].includes(s.unit)) s.unit = 'luong';
-  const codes = ['VND', ...CURRENCIES.map((c) => c.code)];
-  s.conv = { ...DEFAULTS.conv, ...(s.conv || {}) };
-  if (!codes.includes(s.conv.from)) s.conv.from = 'USD';
-  if (!codes.includes(s.conv.to)) s.conv.to = 'VND';
   return s;
 }
 
@@ -81,7 +75,6 @@ const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const pad = (n) => String(n).padStart(2, '0');
 const nf0 = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
-const nf2 = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const fmtToday = new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
 
@@ -93,11 +86,6 @@ const unitLabel = () => (settings.unit === 'chi' ? 'nghìn đồng/chỉ' : 'ngh
 
 function fmtPrice(v) {
   return v == null ? '—' : nf0.format(Math.round(v / unitDiv()));
-}
-
-function fmtRate(v) {
-  if (v == null) return '—';
-  return v >= 1000 ? nf0.format(v) : nf2.format(v);
 }
 
 function fmtMillions(v) {
@@ -112,21 +100,13 @@ function fmtTime(iso, withDate = true) {
   return withDate ? `${hm} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}` : hm;
 }
 
-function fmtMoney(v, code) {
-  if (v == null || !Number.isFinite(v)) return '—';
-  if (code === 'VND') return `${nf0.format(Math.round(v))} ₫`;
-  const c = CURRENCIES.find((x) => x.code === code);
-  const f = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: c?.digits ?? 2, minimumFractionDigits: 0 });
-  return `${f.format(v)} ${code}`;
-}
-
-/** "▲ 500.000" style change versus the reference (previous day) price. */
-function change(cur, ref, fmt = (v) => nf0.format(Math.round(Math.abs(v) / unitDiv()))) {
+/** "▲ 500" style change versus the reference (previous day) price. */
+function change(cur, ref) {
   if (cur == null || ref == null) return '';
   const diff = cur - ref;
-  if (Math.abs(diff) < 1e-9) return '';
+  if (!diff) return '';
   const cls = diff > 0 ? 'up' : 'down';
-  return `<span class="chg ${cls}">${diff > 0 ? '▲' : '▼'} ${fmt(diff)}</span>`;
+  return `<span class="chg ${cls}">${diff > 0 ? '▲' : '▼'} ${fmtPrice(Math.abs(diff))}</span>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -146,7 +126,7 @@ function buildView() {
     const stored = snap.gold?.[shop.id];
     gold[shop.id] = live?.ok ? { ...live, live: true } : stored || live || null;
   }
-  return { gold, fx: snap.fx || null, ref: snap.ref || null };
+  return { gold, ref: snap.ref || null };
 }
 
 function flatPrices(view) {
@@ -168,7 +148,7 @@ function refresh(reason) {
         (s) => ({ s }),
         (e) => ({ e }),
       ),
-      collectAll({ fetchers: BROWSER_FETCHERS, includeFx: false }).catch(() => null),
+      collectAll({ fetchers: BROWSER_FETCHERS }).catch(() => null),
     ]);
     if (snap.s) {
       state.snapshot = snap.s;
@@ -207,8 +187,6 @@ function render() {
   renderStatus();
   renderSummary();
   renderCompare();
-  renderFx();
-  renderConverter();
   renderSources();
 }
 
@@ -340,106 +318,11 @@ function refNote() {
   return `▲▼ so với giá cuối ngày ${d}/${m}/${y}.`;
 }
 
-function renderFx() {
-  const fx = state.view.fx;
-  const ref = state.view.ref?.prices || {};
-  $('#fx-source').textContent = fx?.ok
-    ? `Nguồn: ${fx.source}${fx.sourceTime ? ` · ${fmtTime(fx.sourceTime)}` : ''}${fx.stale ? ' · dữ liệu cũ' : ''}`
-    : '';
-  $('#fx-body').innerHTML = CURRENCIES.map((c) => {
-    const r = fx?.ok ? fx.rates[c.code] : null;
-    const [refTransfer, refSell] = ref[`fx:${c.code}`] || [];
-    const fmt = (d) => fmtRate(Math.abs(d));
-    return `<tr>
-      <th scope="row"><div class="cur"><span class="flag" aria-hidden="true">${c.flag}</span><div><b>${c.code}</b><small>${esc(c.name)}</small></div></div></th>
-      <td class="num cash">${fmtRate(r?.cash)}</td>
-      <td class="num">${fmtRate(r?.transfer)}${change(r?.transfer, refTransfer, fmt)}</td>
-      <td class="num">${fmtRate(r?.sell)}${change(r?.sell, refSell, fmt)}</td>
-    </tr>`;
-  }).join('');
-  if (!fx?.ok) {
-    $('#fx-body').insertAdjacentHTML(
-      'beforeend',
-      `<tr><td colspan="4" class="muted">Chưa lấy được tỉ giá${fx?.error ? ` (${esc(fx.error)})` : ''}.</td></tr>`,
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Currency converter
-
-const CONV_CODES = ['VND', ...CURRENCIES.map((c) => c.code)];
-
-const SIDE = { buy: 'ngân hàng mua vào', sell: 'ngân hàng bán ra' };
-const legNote = (l) => `1 ${l.code} = ${fmtRate(l.rate)} ₫ (${SIDE[l.side]})`;
-
-function setupConverter() {
-  const opts = CONV_CODES.map((code) => {
-    const c = CURRENCIES.find((x) => x.code === code);
-    return `<option value="${code}" title="${c ? c.name : 'Việt Nam đồng'}">${c ? c.flag : '🇻🇳'} ${code}</option>`;
-  }).join('');
-  $('#conv-from').innerHTML = opts;
-  $('#conv-to').innerHTML = opts;
-  $('#conv-amount').value = settings.conv.amount;
-  $('#conv-from').value = settings.conv.from;
-  $('#conv-to').value = settings.conv.to;
-
-  const onChange = () => {
-    settings.conv = { amount: $('#conv-amount').value, from: $('#conv-from').value, to: $('#conv-to').value };
-    saveSettings();
-    renderConverter();
-  };
-  $('#conv-amount').addEventListener('input', onChange);
-  $('#conv-from').addEventListener('change', onChange);
-  $('#conv-to').addEventListener('change', onChange);
-  $('#conv-swap').addEventListener('click', () => {
-    const f = $('#conv-from').value;
-    $('#conv-from').value = $('#conv-to').value;
-    $('#conv-to').value = f;
-    onChange();
-  });
-}
-
-function renderConverter() {
-  const rates = state.view?.fx?.ok ? state.view.fx.rates : null;
-  const { from, to } = settings.conv;
-  const amount = parseAmount(settings.conv.amount);
-  const result = $('#conv-result');
-  const all = $('#conv-all');
-  const note = $('#conv-note');
-  if (!rates) {
-    result.innerHTML = '<small>Đang chờ tỉ giá…</small>';
-    all.innerHTML = '';
-    note.textContent = '';
-    return;
-  }
-  if (amount == null) {
-    result.innerHTML = '<small>Nhập số tiền hợp lệ, ví dụ 100 hoặc 1.000.000</small>';
-    all.innerHTML = '';
-    note.textContent = '';
-    return;
-  }
-  const main = convert(amount, from, to, rates);
-  result.innerHTML = main
-    ? `<small>${esc(fmtMoney(amount, from))} =</small>${esc(fmtMoney(main.value, to))}`
-    : '<small>Không có tỉ giá cho loại tiền này.</small>';
-  all.innerHTML = CONV_CODES.filter((c) => c !== from && c !== to)
-    .map((c) => {
-      const r = convert(amount, from, c, rates);
-      return r ? `<span>${esc(fmtMoney(r.value, c))}</span>` : '';
-    })
-    .join('');
-  note.textContent = main?.legs.length
-    ? `Tính theo tỉ giá ${state.view.fx.source}: ${main.legs.map(legNote).join(' · ')}. Giao dịch tiền mặt có thể chênh lệch.`
-    : '';
-}
-
 function renderSources() {
   const links = SHOPS.map((s) => `<a href="${esc(s.website)}" target="_blank" rel="noopener">${esc(s.name)}</a>`);
   $('#sources').innerHTML =
     `Nguồn giá: ${links.join(', ')}. DOJI, Bảo Tín Minh Châu và SJC chặn truy cập từ nước ngoài nên được lấy qua ` +
-    `<a href="https://giavang.org" target="_blank" rel="noopener">giavang.org</a>. ` +
-    `Tỉ giá: <a href="https://www.vietcombank.com.vn/vi-VN/KHCN/Cong-cu-Tien-ich/Ty-gia" target="_blank" rel="noopener">Vietcombank</a>.` +
+    `<a href="https://giavang.org" target="_blank" rel="noopener">giavang.org</a>.` +
     (state.snapshot?.generatedAt ? ` Máy chủ tổng hợp lúc ${fmtTime(state.snapshot.generatedAt)}.` : '');
 }
 
@@ -625,7 +508,6 @@ function setupControls() {
 
 setupControls();
 setupSettings();
-setupConverter();
 scheduleNext();
 refresh('load');
 

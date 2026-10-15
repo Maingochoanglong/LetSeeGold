@@ -5,16 +5,12 @@ import {
   decodeTurboStream,
   parseBtmh,
   parseNgocTham,
-  parseErApi,
   parseGiavangOrg,
   parseVnexpressSjc,
   parseMihong,
   parseNum,
   parsePhuquy,
   parsePnj,
-  parseVcbJson,
-  parseVcbXml,
-  usDateTime,
   vnDate,
   vnDateTime,
 } from '../site/sources.js';
@@ -39,8 +35,6 @@ test('date helpers use Vietnam time', () => {
   assert.equal(vnDateTime('Cập nhật lúc 16:23 10/10/2026'), '2026-10-10T09:23:00.000Z');
   assert.equal(vnDateTime('11/10/2026 06:55'), '2026-10-10T23:55:00.000Z');
   assert.equal(vnDateTime('không có'), null);
-  assert.equal(usDateTime('10/11/2026 11:57:36 AM'), '2026-10-11T04:57:36.000Z');
-  assert.equal(usDateTime('10/11/2026 1:05:00 PM'), '2026-10-11T06:05:00.000Z');
   assert.equal(vnDate('2026-10-10T17:30:00Z'), '2026-10-11');
   assert.equal(vnDate('2026-10-10T16:59:00Z'), '2026-10-10');
 });
@@ -82,30 +76,10 @@ test('Phú Quý: HTML table, skips silver', () => {
   assert.equal(items.at(-1).sell, null);
 });
 
-test('Vietcombank XML and JSON agree', () => {
-  const xml = parseVcbXml(fixture('vcb.xml'));
-  const js = parseVcbJson(json('vcb.json'));
-  assert.deepEqual(Object.keys(xml.rates), ['USD', 'JPY', 'KRW']);
-  assert.deepEqual(xml.rates.USD, { cash: 25660, transfer: 25690, sell: 26070 });
-  assert.deepEqual(xml.rates.JPY, { cash: 157.62, transfer: 159.21, sell: 168.47 });
-  assert.deepEqual(xml.rates.KRW, { cash: 16.69, transfer: 18.54, sell: 20.12 });
-  assert.deepEqual(js.rates, xml.rates);
-  assert.equal(xml.sourceTime, '2026-10-11T04:57:36.000Z');
-  assert.equal(js.sourceTime, '2026-10-10T16:00:00.000Z');
-});
-
-test('open.er-api fallback gives mid rates in VND', () => {
-  const { rates } = parseErApi(json('er-api.json'));
-  assert.equal(rates.USD.transfer, 26214);
-  assert.equal(rates.USD.cash, null);
-  assert.equal(rates.JPY.sell, Math.round((26214 / 161.19) * 100) / 100);
-});
-
 test('parsers reject empty or foreign payloads', () => {
   assert.throws(() => parsePnj({ errors: {} }));
   assert.throws(() => parseMihong([]));
   assert.throws(() => parsePhuquy('<html>Sorry, you have been blocked</html>'));
-  assert.throws(() => parseVcbXml('<html></html>'));
 });
 
 test('giavang.org SJC: first region only, thousand VND per lượng', () => {

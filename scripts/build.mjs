@@ -52,7 +52,6 @@ for (const [id, s] of Object.entries(snapshot.gold)) {
   const status = s.ok ? `${s.items.length} dòng` : `LỖI: ${s.error}`;
   console.log(`${id.padEnd(8)} ${s.stale ? '(dữ liệu cũ) ' : ''}${status}`);
 }
-console.log(`fx       ${snapshot.fx?.ok ? `${snapshot.fx.source}: ${Object.keys(snapshot.fx.rates).join(', ')}` : `LỖI: ${snapshot.fx?.error}`}`);
 
 const okCount = Object.values(snapshot.gold).filter((s) => s.ok).length;
 if (!okCount) {

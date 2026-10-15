@@ -61,18 +61,9 @@ export const SHOPS = [
   },
 ];
 
-export const CURRENCIES = [
-  { code: 'USD', name: 'Đô la Mỹ', flag: '🇺🇸', symbol: '$', digits: 2 },
-  { code: 'JPY', name: 'Yên Nhật', flag: '🇯🇵', symbol: '¥', digits: 0 },
-  { code: 'KRW', name: 'Won Hàn Quốc', flag: '🇰🇷', symbol: '₩', digits: 0 },
-];
-
 export const URLS = {
   pnj: 'https://edge-api.pnj.io/ecom-frontend/v1/get-gold-price?zone=00',
   mihong: 'https://api.mihong.vn/v1/gold-prices?market=domestic',
-  vcbXml: 'https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx',
-  vcbJson: 'https://www.vietcombank.com.vn/api/exchangerates?date=',
-  erApi: 'https://open.er-api.com/v6/latest/USD',
   phuquy: 'https://phuquygroup.vn/',
   btmh: 'https://baotinmanhhai.vn/bang-gia-vang.data',
   ngoctham: 'https://ngoctham.com/bang-gia-vang/',
@@ -120,20 +111,6 @@ export function vnDateTime(str) {
   const time = /(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(str.replace(date[0], ' ')) || [];
   const [, d, mo, y] = date;
   const [, h = '0', mi = '0', s = '0'] = time;
-  const t = new Date(`${y}-${pad(mo)}-${pad(d)}T${pad(h)}:${pad(mi)}:${pad(s)}+07:00`);
-  return Number.isNaN(t.getTime()) ? null : t.toISOString();
-}
-
-/** Same as vnDateTime but for US-style "10/11/2026 11:57:36 AM" (month first). */
-export function usDateTime(str) {
-  const m = /(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i.exec(str || '');
-  if (!m) return null;
-  let [, mo, d, y, h, mi, s = '0', ap] = m;
-  h = Number(h);
-  if (ap) {
-    if (ap.toUpperCase() === 'PM' && h < 12) h += 12;
-    if (ap.toUpperCase() === 'AM' && h === 12) h = 0;
-  }
   const t = new Date(`${y}-${pad(mo)}-${pad(d)}T${pad(h)}:${pad(mi)}:${pad(s)}+07:00`);
   return Number.isNaN(t.getTime()) ? null : t.toISOString();
 }
@@ -411,75 +388,6 @@ export function parseVnexpressSjc(json) {
   };
 }
 
-/** Vietcombank XML (pXML.aspx). */
-export function parseVcbXml(xml) {
-  const rates = {};
-  const re = /<Exrate\b([^>]*)\/?>/g;
-  let m;
-  while ((m = re.exec(xml))) {
-    const attrs = {};
-    m[1].replace(/(\w+)="([^"]*)"/g, (_, k, v) => {
-      attrs[k] = v;
-    });
-    const code = attrs.CurrencyCode;
-    if (!code) continue;
-    rates[code] = {
-      cash: price2(parseNum(attrs.Buy)),
-      transfer: price2(parseNum(attrs.Transfer)),
-      sell: price2(parseNum(attrs.Sell)),
-    };
-  }
-  const time = /<DateTime>([^<]+)<\/DateTime>/.exec(xml)?.[1];
-  return { rates: pickCurrencies(rates, 'Vietcombank'), sourceTime: usDateTime(time) };
-}
-
-/** Vietcombank JSON (www.vietcombank.com.vn/api/exchangerates). */
-export function parseVcbJson(json) {
-  const rates = {};
-  for (const r of json?.Data || []) {
-    rates[r.currencyCode] = {
-      cash: price2(parseNum(r.cash)),
-      transfer: price2(parseNum(r.transfer)),
-      sell: price2(parseNum(r.sell)),
-    };
-  }
-  const t = json?.UpdatedDate ? new Date(json.UpdatedDate) : null;
-  return {
-    rates: pickCurrencies(rates, 'Vietcombank'),
-    sourceTime: t && !Number.isNaN(t.getTime()) ? t.toISOString() : null,
-  };
-}
-
-/** open.er-api.com: mid-market rates only, used when Vietcombank is down. */
-export function parseErApi(json) {
-  const r = json?.rates || {};
-  const vnd = parseNum(r.VND);
-  if (!vnd) throw new Error('Thiếu tỉ giá VND');
-  const rates = {};
-  for (const { code } of CURRENCIES) {
-    const per = parseNum(r[code]);
-    if (!per) continue;
-    const mid = vnd / per;
-    rates[code] = { cash: null, transfer: price2(mid), sell: price2(mid) };
-  }
-  const t = json?.time_last_update_unix ? new Date(json.time_last_update_unix * 1000).toISOString() : null;
-  return { rates: pickCurrencies(rates, 'open.er-api.com'), sourceTime: t };
-}
-
-function price2(n) {
-  return n != null && n > 0 ? Math.round(n * 100) / 100 : null;
-}
-
-function pickCurrencies(all, what) {
-  const rates = {};
-  for (const { code } of CURRENCIES) {
-    const r = all[code];
-    if (r && (r.transfer || r.sell || r.cash)) rates[code] = r;
-  }
-  if (!Object.keys(rates).length) throw new Error(`Không đọc được tỉ giá từ ${what}`);
-  return rates;
-}
-
 // ---------------------------------------------------------------------------
 // Fetching
 
@@ -553,16 +461,6 @@ export const BROWSER_FETCHERS = {
   mihong: GOLD_FETCHERS.mihong,
 };
 
-/** Exchange rates: Vietcombank first, then a mid-market fallback. */
-export function fetchFx() {
-  const vcb = 'Vietcombank';
-  return firstOk([
-    async () => ({ source: vcb, ...parseVcbXml(await get(URLS.vcbXml, { type: 'text' })) }),
-    async () => ({ source: vcb, ...parseVcbJson(await get(URLS.vcbJson + vnDate())) }),
-    async () => ({ source: 'open.er-api.com (tỉ giá trung bình)', ...parseErApi(await get(URLS.erApi)) }),
-  ]);
-}
-
 /** Runs a fetcher and turns the outcome into a serialisable status object. */
 export async function settle(run) {
   const fetchedAt = new Date().toISOString();
@@ -573,16 +471,13 @@ export async function settle(run) {
   }
 }
 
-/** Fetches every shop in `fetchers`, plus the exchange rates. */
-export async function collectAll({ fetchers = GOLD_FETCHERS, includeFx = true } = {}) {
+/** Fetches every shop in `fetchers`. */
+export async function collectAll({ fetchers = GOLD_FETCHERS } = {}) {
   const ids = SHOPS.map((s) => s.id).filter((id) => fetchers[id]);
-  const [goldResults, fx] = await Promise.all([
-    Promise.all(ids.map((id) => settle(fetchers[id]))),
-    includeFx ? settle(fetchFx) : null,
-  ]);
+  const results = await Promise.all(ids.map((id) => settle(fetchers[id])));
   const gold = {};
   ids.forEach((id, i) => {
-    gold[id] = goldResults[i];
+    gold[id] = results[i];
   });
-  return { generatedAt: new Date().toISOString(), gold, fx };
+  return { generatedAt: new Date().toISOString(), gold };
 }
