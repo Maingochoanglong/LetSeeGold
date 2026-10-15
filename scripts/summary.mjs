@@ -13,12 +13,4 @@ for (const shop of SHOPS) {
   const status = !s ? 'không có' : !s.ok ? `❌ ${s.error}` : s.stale ? `⚠️ dữ liệu cũ (${s.error})` : `✅ ${s.via || 'chính chủ'}`;
   lines.push(`| ${shop.name} | ${status} | ${s?.ok ? s.items.length : 0} | ${first ? `${first.name}: ${fmt(first.buy)} / ${fmt(first.sell)}` : ''} |`);
 }
-const fx = snap.fx;
-lines.push(
-  `| Tỉ giá | ${fx?.ok ? `✅ ${fx.source}` : `❌ ${fx?.error}`} | ${fx?.ok ? Object.keys(fx.rates).length : 0} | ${
-    fx?.ok ? Object.entries(fx.rates).map(([c, r]) => `${c} ${r.transfer}`).join(', ') : ''
-  } |`,
-);
-const w = snap.world;
-lines.push(`| Thế giới | ${w?.ok ? '✅' : `❌ ${w?.error}`} | | ${w?.ok ? `${w.usdPerOunce} USD/oz` : ''} |`);
 console.log(lines.join('\n'));

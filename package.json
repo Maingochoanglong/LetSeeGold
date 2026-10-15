@@ -2,7 +2,7 @@
   "name": "letseegold",
   "version": "1.0.0",
   "private": true,
-  "description": "Giá vàng (SJC, PNJ, Mi Hồng, DOJI, Bảo Tín Minh Châu, Phú Quý) và tỉ giá USD/JPY/KRW – trang tĩnh miễn phí trên GitHub Pages.",
+  "description": "Giá vàng miếng SJC tại PNJ, Mi Hồng, Bảo Tín Mạnh Hải, Phú Quý, Ngọc Thẩm, DOJI, Bảo Tín Minh Châu, SJC – trang tĩnh miễn phí trên GitHub Pages.",
   "type": "module",
   "engines": {
     "node": ">=20"

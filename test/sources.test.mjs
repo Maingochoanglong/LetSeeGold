@@ -2,20 +2,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  parseErApi,
+  decodeTurboStream,
+  parseBtmh,
+  parseNgocTham,
   parseGiavangOrg,
   parseVnexpressSjc,
   parseMihong,
   parseNum,
   parsePhuquy,
   parsePnj,
-  parseVcbJson,
-  parseVcbXml,
-  parseWorldGold,
-  usDateTime,
   vnDate,
   vnDateTime,
-  worldToVndPerLuong,
 } from '../site/sources.js';
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
@@ -38,8 +35,6 @@ test('date helpers use Vietnam time', () => {
   assert.equal(vnDateTime('Cập nhật lúc 16:23 10/10/2026'), '2026-10-10T09:23:00.000Z');
   assert.equal(vnDateTime('11/10/2026 06:55'), '2026-10-10T23:55:00.000Z');
   assert.equal(vnDateTime('không có'), null);
-  assert.equal(usDateTime('10/11/2026 11:57:36 AM'), '2026-10-11T04:57:36.000Z');
-  assert.equal(usDateTime('10/11/2026 1:05:00 PM'), '2026-10-11T06:05:00.000Z');
   assert.equal(vnDate('2026-10-10T17:30:00Z'), '2026-10-11');
   assert.equal(vnDate('2026-10-10T16:59:00Z'), '2026-10-10');
 });
@@ -81,37 +76,10 @@ test('Phú Quý: HTML table, skips silver', () => {
   assert.equal(items.at(-1).sell, null);
 });
 
-test('Vietcombank XML and JSON agree', () => {
-  const xml = parseVcbXml(fixture('vcb.xml'));
-  const js = parseVcbJson(json('vcb.json'));
-  assert.deepEqual(Object.keys(xml.rates), ['USD', 'JPY', 'KRW']);
-  assert.deepEqual(xml.rates.USD, { cash: 25660, transfer: 25690, sell: 26070 });
-  assert.deepEqual(xml.rates.JPY, { cash: 157.62, transfer: 159.21, sell: 168.47 });
-  assert.deepEqual(xml.rates.KRW, { cash: 16.69, transfer: 18.54, sell: 20.12 });
-  assert.deepEqual(js.rates, xml.rates);
-  assert.equal(xml.sourceTime, '2026-10-11T04:57:36.000Z');
-  assert.equal(js.sourceTime, '2026-10-10T16:00:00.000Z');
-});
-
-test('open.er-api fallback gives mid rates in VND', () => {
-  const { rates } = parseErApi(json('er-api.json'));
-  assert.equal(rates.USD.transfer, 26214);
-  assert.equal(rates.USD.cash, null);
-  assert.equal(rates.JPY.sell, Math.round((26214 / 161.19) * 100) / 100);
-});
-
-test('world gold conversion', () => {
-  const { usdPerOunce } = parseWorldGold(json('gold-api.json'));
-  assert.equal(usdPerOunce, 4195.6);
-  // 1 lượng = 37.5 g = 1.20565 oz
-  assert.equal(worldToVndPerLuong(4195.6, 26070), Math.round(((4195.6 * 37.5) / 31.1034768) * 26070));
-});
-
 test('parsers reject empty or foreign payloads', () => {
   assert.throws(() => parsePnj({ errors: {} }));
   assert.throws(() => parseMihong([]));
   assert.throws(() => parsePhuquy('<html>Sorry, you have been blocked</html>'));
-  assert.throws(() => parseVcbXml('<html></html>'));
 });
 
 test('giavang.org SJC: first region only, thousand VND per lượng', () => {
@@ -160,4 +128,34 @@ test('VnExpress SJC fallback', () => {
   assert.equal(r.items[0].buy, 141_800_000);
   assert.equal(r.items[0].sell, 144_800_000);
   assert.throws(() => parseVnexpressSjc({ data: {} }));
+});
+
+test('turbo-stream decoding: shared values and special indexes', () => {
+  const text = JSON.stringify([{ _1: 2, _3: 4 }, 'a', 'shared', 'b', [2, 2, -5, 5], 7]);
+  assert.deepEqual(decodeTurboStream(text), { a: 'shared', b: ['shared', 'shared', null, 7] });
+});
+
+test('Bảo Tín Mạnh Hải: route data, per-row units, no silver', () => {
+  const { items, sourceTime } = parseBtmh(fixture('btmh.data'));
+  assert.equal(sourceTime, '2026-10-09T10:49:21.000Z');
+  assert.ok(items.every((i) => !/bạc|ngân gia bảo/i.test(i.name)), 'silver rows are skipped');
+  const sjc = byKey(items, 'btmh:SJC9999');
+  assert.equal(sjc.name, 'Vàng miếng SJC (Cty CP BTMH)');
+  assert.equal(sjc.buy, 141_800_000);
+  assert.equal(sjc.sell, 144_800_000);
+  // Priced per 0,1 chỉ on the site.
+  assert.equal(byKey(items, 'btmh:BT-TKC').buy, 139_800_000);
+  // The site writes 1 in the sell column of buy-only rows.
+  assert.equal(byKey(items, 'btmh:NL9999').sell, null);
+  assert.equal(items.length, 9);
+});
+
+test('Ngọc Thẩm: price table, VND per chỉ', () => {
+  const { items, sourceTime } = parseNgocTham(fixture('ngoctham.html'));
+  assert.equal(sourceTime, '2026-10-11T00:30:00.000Z');
+  assert.equal(items.length, 6);
+  const sjc = items.find((i) => /SJC/.test(i.name));
+  assert.deepEqual({ name: sjc.name, buy: sjc.buy, sell: sjc.sell }, { name: 'Vàng Miếng SJC (Loại 10 chỉ)', buy: 140_000_000, sell: 143_500_000 });
+  assert.equal(items[0].name, 'Nhẫn Trơn 24K');
+  assert.throws(() => parseNgocTham('<html>Bảo trì</html>'));
 });

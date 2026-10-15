@@ -7,29 +7,39 @@
 // All gold prices are normalised to VND per lượng (1 lượng = 10 chỉ = 37.5 g).
 
 export const CHI_PER_LUONG = 10;
-export const GRAMS_PER_LUONG = 37.5;
-export const GRAMS_PER_TROY_OUNCE = 31.1034768;
 
+// Shops whose own websites can be read come first; the last three are read
+// from the giavang.org mirror because their sites refuse servers abroad.
 export const SHOPS = [
-  {
-    id: 'sjc',
-    name: 'SJC',
-    fullName: 'Công ty Vàng bạc Đá quý Sài Gòn',
-    website: 'https://sjc.com.vn',
-  },
   {
     id: 'pnj',
     name: 'PNJ',
     fullName: 'Vàng bạc Đá quý Phú Nhuận',
     website: 'https://www.pnj.com.vn/site/gia-vang',
-    browser: true,
   },
   {
     id: 'mihong',
     name: 'Mi Hồng',
     fullName: 'Tiệm vàng Mi Hồng (TP.HCM)',
     website: 'https://www.mihong.vn/vi/gia-vang-trong-nuoc',
-    browser: true,
+  },
+  {
+    id: 'btmh',
+    name: 'Bảo Tín Mạnh Hải',
+    fullName: 'Công ty cổ phần Bảo Tín Mạnh Hải (Hà Nội)',
+    website: 'https://baotinmanhhai.vn/bang-gia-vang',
+  },
+  {
+    id: 'phuquy',
+    name: 'Phú Quý',
+    fullName: 'Tập đoàn Vàng bạc Đá quý Phú Quý',
+    website: 'https://phuquygroup.vn',
+  },
+  {
+    id: 'ngoctham',
+    name: 'Ngọc Thẩm',
+    fullName: 'Trang sức Ngọc Thẩm (TP.HCM)',
+    website: 'https://ngoctham.com/bang-gia-vang/',
   },
   {
     id: 'doji',
@@ -44,27 +54,19 @@ export const SHOPS = [
     website: 'https://btmc.vn',
   },
   {
-    id: 'phuquy',
-    name: 'Phú Quý',
-    fullName: 'Tập đoàn Vàng bạc Đá quý Phú Quý',
-    website: 'https://phuquygroup.vn',
+    id: 'sjc',
+    name: 'SJC',
+    fullName: 'Công ty Vàng bạc Đá quý Sài Gòn',
+    website: 'https://sjc.com.vn',
   },
-];
-
-export const CURRENCIES = [
-  { code: 'USD', name: 'Đô la Mỹ', flag: '🇺🇸', symbol: '$', digits: 2 },
-  { code: 'JPY', name: 'Yên Nhật', flag: '🇯🇵', symbol: '¥', digits: 0 },
-  { code: 'KRW', name: 'Won Hàn Quốc', flag: '🇰🇷', symbol: '₩', digits: 0 },
 ];
 
 export const URLS = {
   pnj: 'https://edge-api.pnj.io/ecom-frontend/v1/get-gold-price?zone=00',
   mihong: 'https://api.mihong.vn/v1/gold-prices?market=domestic',
-  vcbXml: 'https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx',
-  vcbJson: 'https://www.vietcombank.com.vn/api/exchangerates?date=',
-  erApi: 'https://open.er-api.com/v6/latest/USD',
-  worldGold: 'https://api.gold-api.com/price/XAU',
   phuquy: 'https://phuquygroup.vn/',
+  btmh: 'https://baotinmanhhai.vn/bang-gia-vang.data',
+  ngoctham: 'https://ngoctham.com/bang-gia-vang/',
   vnexpress: 'https://gw.vnexpress.net/cr/?name=tygia_vangv202206',
   giavangOrg: (page) => `https://giavang.org/trong-nuoc/${page}/`,
 };
@@ -91,9 +93,12 @@ export function parseNum(value, decimal = '.') {
   return Number(s);
 }
 
-/** A price that is missing, zero or negative means "not traded". */
+/**
+ * A price that is missing or implausibly small means "not traded" (some shops
+ * write 0 or 1 in the column they do not quote).
+ */
 function price(value) {
-  return value != null && Number.isFinite(value) && value > 0 ? Math.round(value) : null;
+  return value != null && Number.isFinite(value) && value >= 1000 ? Math.round(value) : null;
 }
 
 /**
@@ -106,20 +111,6 @@ export function vnDateTime(str) {
   const time = /(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(str.replace(date[0], ' ')) || [];
   const [, d, mo, y] = date;
   const [, h = '0', mi = '0', s = '0'] = time;
-  const t = new Date(`${y}-${pad(mo)}-${pad(d)}T${pad(h)}:${pad(mi)}:${pad(s)}+07:00`);
-  return Number.isNaN(t.getTime()) ? null : t.toISOString();
-}
-
-/** Same as vnDateTime but for US-style "10/11/2026 11:57:36 AM" (month first). */
-export function usDateTime(str) {
-  const m = /(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i.exec(str || '');
-  if (!m) return null;
-  let [, mo, d, y, h, mi, s = '0', ap] = m;
-  h = Number(h);
-  if (ap) {
-    if (ap.toUpperCase() === 'PM' && h < 12) h += 12;
-    if (ap.toUpperCase() === 'AM' && h === 12) h = 0;
-  }
   const t = new Date(`${y}-${pad(mo)}-${pad(d)}T${pad(h)}:${pad(mi)}:${pad(s)}+07:00`);
   return Number.isNaN(t.getTime()) ? null : t.toISOString();
 }
@@ -212,6 +203,90 @@ export function parseMihong(json) {
   });
   const times = rows.map((r) => vnDateTime(r.dateTime)).filter(Boolean).sort();
   return { items: ensureItems(items, 'Mi Hồng'), sourceTime: times.at(-1) || null };
+}
+
+/**
+ * Decodes a React Router "turbo-stream" payload: a flat JSON array where
+ * objects are {"_<key index>": <value index>} and arrays hold value indexes,
+ * so repeated values are stored once. Negative indexes are special values.
+ */
+export function decodeTurboStream(text) {
+  const values = JSON.parse(text);
+  if (!Array.isArray(values)) throw new Error('Không phải turbo-stream');
+  const special = { '-5': null, '-7': undefined, '-1': undefined, '-2': NaN };
+  const done = new Map();
+  const hydrate = (i) => {
+    if (i < 0) return special[i];
+    if (done.has(i)) return done.get(i);
+    const v = values[i];
+    if (v === null || typeof v !== 'object') return v;
+    if (Array.isArray(v)) {
+      if (typeof v[0] === 'string') return v[0] === 'D' ? new Date(v[1]).toISOString() : null; // typed values
+      const out = [];
+      done.set(i, out);
+      for (const x of v) out.push(hydrate(x));
+      return out;
+    }
+    const out = {};
+    done.set(i, out);
+    for (const [k, x] of Object.entries(v)) out[values[Number(k.slice(1))]] = hydrate(x);
+    return out;
+  };
+  return hydrate(0);
+}
+
+/**
+ * Bảo Tín Mạnh Hải: the price page's route data (turbo-stream). Rows carry
+ * their own unit ("VND/1 chỉ", "VND/0,1 chỉ", "VND/1 lượng").
+ */
+export function parseBtmh(text) {
+  const root = decodeTurboStream(text);
+  const blocks = Object.values(root || {}).flatMap((route) => route?.data?.blocks || []);
+  const seen = new Set();
+  const items = [];
+  const times = [];
+  for (const block of blocks) {
+    if (block?.block_type !== 'gold_price_table') continue;
+    for (const r of block.data?._gold_rates?.items || []) {
+      if (!r?.code || seen.has(r.code)) continue;
+      seen.add(r.code);
+      if (/BAC/i.test(r.code) || /bạc/i.test(r.name || '')) continue; // silver
+      const unit = /VND\/\s*([\d.,]*)\s*(chỉ|lượng)?/i.exec(r.unit || '');
+      const qty = (unit && parseNum(unit[1], ',')) || 1;
+      const perLuong = (unit && /lượng/i.test(unit[2] || '') ? 1 : CHI_PER_LUONG) / qty;
+      const b = parseNum(r.buy_price);
+      const s = parseNum(r.sell_price);
+      items.push(item('btmh', r.code, String(r.name || r.code), b && b * perLuong, s && s * perLuong));
+      const t = /(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(r.last_updated || '');
+      if (t) times.push(`${t[1]}-${t[2]}-${t[3]}T${t[4]}:${t[5]}:${t[6]}+07:00`);
+    }
+  }
+  const latest = times.sort().at(-1);
+  return { items: ensureItems(items, 'Bảo Tín Mạnh Hải'), sourceTime: latest ? new Date(latest).toISOString() : null };
+}
+
+/** Ngọc Thẩm: price table on the website, VND per chỉ. */
+export function parseNgocTham(html) {
+  const unit = /ĐƠN VỊ TÍNH[\s\S]{0,80}?VND\s*\/\s*(Chỉ|Lượng)/i.exec(html);
+  const factor = unit && /lượng/i.test(unit[1]) ? 1 : CHI_PER_LUONG;
+  const items = [];
+  for (const tr of html.match(/<tr\b[\s\S]*?<\/tr>/gi) || []) {
+    const name = /class="name-gold"[^>]*>([\s\S]*?)<\/td>/i.exec(tr);
+    if (!name) continue;
+    const buy = parseNum(cleanText(/class="price-buy"[^>]*>([\s\S]*?)<\/td>/i.exec(tr)?.[1] || ''), ',');
+    const sell = parseNum(cleanText(/class="price-sell"[^>]*>([\s\S]*?)<\/td>/i.exec(tr)?.[1] || ''), ',');
+    items.push(item('ngoctham', null, cleanText(name[1]), buy && buy * factor, sell && sell * factor));
+  }
+  // "Cập nhật ngày 11/10/2026 07:30 AM"
+  const t = /Cập nhật ngày[\s\S]{0,60}?(\d{1,2}\/\d{1,2}\/\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)?/i.exec(decodeEntities(html));
+  let sourceTime = null;
+  if (t) {
+    let h = Number(t[2]);
+    if (t[4]?.toUpperCase() === 'PM' && h < 12) h += 12;
+    if (t[4]?.toUpperCase() === 'AM' && h === 12) h = 0;
+    sourceTime = vnDateTime(`${t[1]} ${h}:${t[3]}`);
+  }
+  return { items: ensureItems(items, 'Ngọc Thẩm'), sourceTime };
 }
 
 /** Rows of the first `<table>` after `from` as arrays of cell text. */
@@ -313,88 +388,6 @@ export function parseVnexpressSjc(json) {
   };
 }
 
-/** Vietcombank XML (pXML.aspx). */
-export function parseVcbXml(xml) {
-  const rates = {};
-  const re = /<Exrate\b([^>]*)\/?>/g;
-  let m;
-  while ((m = re.exec(xml))) {
-    const attrs = {};
-    m[1].replace(/(\w+)="([^"]*)"/g, (_, k, v) => {
-      attrs[k] = v;
-    });
-    const code = attrs.CurrencyCode;
-    if (!code) continue;
-    rates[code] = {
-      cash: price2(parseNum(attrs.Buy)),
-      transfer: price2(parseNum(attrs.Transfer)),
-      sell: price2(parseNum(attrs.Sell)),
-    };
-  }
-  const time = /<DateTime>([^<]+)<\/DateTime>/.exec(xml)?.[1];
-  return { rates: pickCurrencies(rates, 'Vietcombank'), sourceTime: usDateTime(time) };
-}
-
-/** Vietcombank JSON (www.vietcombank.com.vn/api/exchangerates). */
-export function parseVcbJson(json) {
-  const rates = {};
-  for (const r of json?.Data || []) {
-    rates[r.currencyCode] = {
-      cash: price2(parseNum(r.cash)),
-      transfer: price2(parseNum(r.transfer)),
-      sell: price2(parseNum(r.sell)),
-    };
-  }
-  const t = json?.UpdatedDate ? new Date(json.UpdatedDate) : null;
-  return {
-    rates: pickCurrencies(rates, 'Vietcombank'),
-    sourceTime: t && !Number.isNaN(t.getTime()) ? t.toISOString() : null,
-  };
-}
-
-/** open.er-api.com: mid-market rates only, used when Vietcombank is down. */
-export function parseErApi(json) {
-  const r = json?.rates || {};
-  const vnd = parseNum(r.VND);
-  if (!vnd) throw new Error('Thiếu tỉ giá VND');
-  const rates = {};
-  for (const { code } of CURRENCIES) {
-    const per = parseNum(r[code]);
-    if (!per) continue;
-    const mid = vnd / per;
-    rates[code] = { cash: null, transfer: price2(mid), sell: price2(mid) };
-  }
-  const t = json?.time_last_update_unix ? new Date(json.time_last_update_unix * 1000).toISOString() : null;
-  return { rates: pickCurrencies(rates, 'open.er-api.com'), sourceTime: t };
-}
-
-function price2(n) {
-  return n != null && n > 0 ? Math.round(n * 100) / 100 : null;
-}
-
-function pickCurrencies(all, what) {
-  const rates = {};
-  for (const { code } of CURRENCIES) {
-    const r = all[code];
-    if (r && (r.transfer || r.sell || r.cash)) rates[code] = r;
-  }
-  if (!Object.keys(rates).length) throw new Error(`Không đọc được tỉ giá từ ${what}`);
-  return rates;
-}
-
-/** gold-api.com: world spot price in USD per troy ounce. */
-export function parseWorldGold(json) {
-  const p = parseNum(json?.price);
-  if (!p || p <= 0) throw new Error('Không đọc được giá vàng thế giới');
-  return { usdPerOunce: Math.round(p * 100) / 100, sourceTime: json?.updatedAt || null };
-}
-
-/** World price converted to VND per lượng with a given USD rate. */
-export function worldToVndPerLuong(usdPerOunce, usdVnd) {
-  if (!usdPerOunce || !usdVnd) return null;
-  return Math.round(((usdPerOunce * GRAMS_PER_LUONG) / GRAMS_PER_TROY_OUNCE) * usdVnd);
-}
-
 // ---------------------------------------------------------------------------
 // Fetching
 
@@ -454,21 +447,19 @@ export const GOLD_FETCHERS = {
   btmc: async () =>
     parseGiavangOrg(await get(URLS.giavangOrg('bao-tin-minh-chau'), { type: 'text' }), 'btmc', { groups: 'all' }),
   phuquy: async () => parsePhuquy(await get(URLS.phuquy, { type: 'text' })),
+  btmh: async () => parseBtmh(await get(URLS.btmh, { type: 'text' })),
+  ngoctham: async () => parseNgocTham(await get(URLS.ngoctham, { type: 'text' })),
 };
 
-/** Exchange rates: Vietcombank first, then a mid-market fallback. */
-export function fetchFx() {
-  const vcb = 'Vietcombank';
-  return firstOk([
-    async () => ({ source: vcb, ...parseVcbXml(await get(URLS.vcbXml, { type: 'text' })) }),
-    async () => ({ source: vcb, ...parseVcbJson(await get(URLS.vcbJson + vnDate())) }),
-    async () => ({ source: 'open.er-api.com (tỉ giá trung bình)', ...parseErApi(await get(URLS.erApi)) }),
-  ]);
-}
-
-export async function fetchWorldGold() {
-  return parseWorldGold(await get(URLS.worldGold));
-}
+/**
+ * Shops the page also reads by itself at the user's scheduled times, straight
+ * from the shop: their APIs allow cross-origin reads. The others come from
+ * the scheduled build.
+ */
+export const BROWSER_FETCHERS = {
+  pnj: GOLD_FETCHERS.pnj,
+  mihong: GOLD_FETCHERS.mihong,
+};
 
 /** Runs a fetcher and turns the outcome into a serialisable status object. */
 export async function settle(run) {
@@ -480,20 +471,13 @@ export async function settle(run) {
   }
 }
 
-/**
- * Fetches everything. `only` limits gold shops (the browser only refreshes the
- * shops whose APIs allow cross-origin requests).
- */
-export async function collectAll({ only, includeFx = true, includeWorld = true } = {}) {
-  const ids = SHOPS.map((s) => s.id).filter((id) => GOLD_FETCHERS[id] && (!only || only.includes(id)));
-  const [goldResults, fx, world] = await Promise.all([
-    Promise.all(ids.map((id) => settle(GOLD_FETCHERS[id]))),
-    includeFx ? settle(fetchFx) : null,
-    includeWorld ? settle(fetchWorldGold) : null,
-  ]);
+/** Fetches every shop in `fetchers`. */
+export async function collectAll({ fetchers = GOLD_FETCHERS } = {}) {
+  const ids = SHOPS.map((s) => s.id).filter((id) => fetchers[id]);
+  const results = await Promise.all(ids.map((id) => settle(fetchers[id])));
   const gold = {};
   ids.forEach((id, i) => {
-    gold[id] = goldResults[i];
+    gold[id] = results[i];
   });
-  return { generatedAt: new Date().toISOString(), gold, fx, world };
+  return { generatedAt: new Date().toISOString(), gold };
 }

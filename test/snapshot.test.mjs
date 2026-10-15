@@ -7,7 +7,7 @@ const fail = (fetchedAt, error = 'HTTP 503') => ({ ok: false, fetchedAt, error }
 const it = (key, buy, sell) => ({ key, name: key, buy, sell });
 
 function snap(generatedAt, gold, extra = {}) {
-  return { generatedAt, gold, fx: null, world: null, ...extra };
+  return { generatedAt, gold, ...extra };
 }
 
 test('keeps the last good data of a failing source, marked stale', () => {
@@ -37,15 +37,10 @@ test('fresh data replaces stale data', () => {
 });
 
 test('reference prices roll over at midnight Vietnam time', () => {
-  const day1 = snap('2026-10-10T16:50:00Z', { pnj: ok('2026-10-10T16:50:00Z', [it('pnj:SJC', 100, 110)]) }, {
-    fx: { ok: true, fetchedAt: '2026-10-10T16:50:00Z', rates: { USD: { cash: 1, transfer: 25000, sell: 25300 } } },
-  });
+  const day1 = snap('2026-10-10T16:50:00Z', { pnj: ok('2026-10-10T16:50:00Z', [it('pnj:SJC', 100, 110)]) });
   // 23:50 -> 00:05 (UTC+7): the last snapshot of the 10th becomes the reference.
   const first = mergeSnapshot(snap('2026-10-10T17:05:00Z', { pnj: ok('2026-10-10T17:05:00Z', [it('pnj:SJC', 105, 115)]) }), day1);
-  assert.deepEqual(first.ref, {
-    date: '2026-10-10',
-    prices: { 'pnj:SJC': [100, 110], 'fx:USD': [25000, 25300] },
-  });
+  assert.deepEqual(first.ref, { date: '2026-10-10', prices: { 'pnj:SJC': [100, 110] } });
   // Later the same day the reference is carried over unchanged.
   const second = mergeSnapshot(snap('2026-10-11T05:00:00Z', { pnj: ok('2026-10-11T05:00:00Z', [it('pnj:SJC', 120, 130)]) }), first);
   assert.deepEqual(second.ref, first.ref);
@@ -57,11 +52,7 @@ test('no reference without history', () => {
   assert.equal(out.version, 1);
 });
 
-test('pricesOf flattens gold, fx and world', () => {
-  const p = pricesOf({
-    gold: { a: ok('x', [it('a:1', 1, 2)]), b: fail('x') },
-    fx: { ok: true, rates: { JPY: { cash: 1, transfer: 2, sell: 3 } } },
-    world: { ok: true, usdPerOunce: 4000 },
-  });
-  assert.deepEqual(p, { 'a:1': [1, 2], 'fx:JPY': [2, 3], 'world:xau': [4000, null] });
+test('pricesOf flattens gold prices', () => {
+  const p = pricesOf({ gold: { a: ok('x', [it('a:1', 1, 2)]), b: fail('x') } });
+  assert.deepEqual(p, { 'a:1': [1, 2] });
 });

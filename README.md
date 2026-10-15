@@ -1,17 +1,18 @@
-# LetSeeGold – Giá vàng & tỉ giá hôm nay
+# LetSeeGold – Giá vàng SJC hôm nay
 
-Trang web xem **giá vàng mua vào / bán ra** tại các cửa hàng uy tín và **tỉ giá USD, JPY, KRW**, có **lịch tự cập nhật** theo khung giờ người dùng chọn.
+Trang web xem **giá vàng miếng SJC mua vào / bán ra** tại các cửa hàng uy tín, có **lịch tự cập nhật** theo khung giờ người dùng chọn.
 
 🌐 Địa chỉ công khai (sau khi bật GitHub Pages): **https://maingochoanglong.github.io/LetSeeGold/**
 
 ## Tính năng
 
-- **Giá vàng 6 cửa hàng:** SJC, PNJ, Mi Hồng, DOJI, Bảo Tín Minh Châu, Phú Quý. Mỗi dòng có giá mua vào, bán ra và mức tăng/giảm (▲▼) so với cuối ngày hôm trước.
-- **So sánh nhanh** giá vàng miếng SJC và nhẫn trơn 9999 giữa các tiệm. Tiệm mua vào cao nhất và bán ra thấp nhất được tô nổi bật.
-- **Giá vàng thế giới** (USD/oz), quy đổi ra đ/lượng, kèm chênh lệch so với SJC.
-- **Đổi đơn vị** giữa đ/lượng và đ/chỉ.
-- **Tỉ giá Vietcombank** cho USD, JPY, KRW: mua tiền mặt, mua chuyển khoản, bán ra.
-- **Quy đổi tiền tệ** giữa VND, USD, JPY và KRW theo giá ngân hàng mua vào / bán ra.
+- **Giá vàng miếng SJC tại các cửa hàng**: PNJ, Mi Hồng, Bảo Tín Mạnh Hải, Phú Quý, Ngọc Thẩm, DOJI, Bảo Tín Minh Châu, SJC.
+  - Đầu bảng có 2 ô tóm tắt: **mua vào cao nhất** và **bán ra thấp nhất**, kèm tên tiệm.
+  - Mỗi dòng có giá mua vào, bán ra, chênh lệch mua–bán và mức tăng/giảm (▲▼) so với cuối ngày hôm trước.
+  - Mỗi dòng ghi nguồn (✓ chính hãng hay qua trang tổng hợp) và giờ cửa hàng niêm yết. Giá chưa đổi hơn một ngày được tô màu cảnh báo.
+  - Giá tốt nhất được tô vàng. Bấm tên tiệm để mở website của tiệm.
+  - Tiêu đề tab trình duyệt hiện luôn giá tốt nhất, ví dụ `142.000 / 143.500 · Giá vàng SJC`.
+- **Đơn vị** giống bảng giá của các tiệm: **nghìn đồng/lượng** (ví dụ 141.800), có thể đổi sang nghìn đồng/chỉ.
 - **Lịch cập nhật** do người dùng tự chọn và được lưu lại trên máy:
   - *Theo giờ cố định*: ví dụ 08:30, 11:30, 14:30, 17:00 mỗi ngày.
   - *Định kỳ trong khung giờ*: ví dụ mỗi 15 phút, từ 08:00 đến 18:00.
@@ -45,29 +46,28 @@ Từ đó GitHub tự lấy giá mới khoảng mỗi 10 phút và đăng lại 
 GitHub Actions (≈10 phút/lần)                       Trình duyệt người dùng
 ┌──────────────────────────────┐                    ┌──────────────────────────────┐
 │ scripts/build.mjs            │                    │ index.html + app.js          │
-│  • lấy giá 6 cửa hàng        │  data/latest.json  │  • đọc data/latest.json      │
-│  • tỉ giá Vietcombank        │ ─────────────────▶ │  • lấy trực tiếp PNJ, Mi Hồng│
-│  • giá vàng thế giới         │   GitHub Pages     │    và giá thế giới           │
-│  • so với cuối ngày hôm qua  │                    │  • chạy lịch cập nhật        │
+│  • lấy giá 8 cửa hàng        │  data/latest.json  │  • đọc data/latest.json      │
+│  • so với cuối ngày hôm qua  │ ─────────────────▶ │  • lấy trực tiếp PNJ, Mi Hồng│
+│                              │   GitHub Pages     │  • chạy lịch cập nhật        │
 └──────────────────────────────┘                    └──────────────────────────────┘
 ```
 
-- PNJ, Mi Hồng và giá thế giới cho phép trình duyệt đọc trực tiếp. Vì vậy, đến giờ người dùng đã hẹn, trang lấy **giá mới nhất ngay lúc đó** từ các nguồn này.
+- PNJ và Mi Hồng cho phép trình duyệt đọc trực tiếp. Vì vậy, đến giờ người dùng đã hẹn, trang lấy **giá mới nhất ngay lúc đó** từ các nguồn này.
 - Các nguồn còn lại được GitHub Actions lấy về khoảng 10 phút một lần.
 - Nếu một nguồn tạm lỗi, trang vẫn hiển thị giá lấy được gần nhất (trong vòng 3 ngày), gắn nhãn "Dữ liệu cũ".
 
 | Cửa hàng | Nguồn |
 |---|---|
-| PNJ | API của PNJ (`edge-api.pnj.io`) |
-| Mi Hồng | API của Mi Hồng (`api.mihong.vn`) |
+| PNJ | API trên website PNJ (`edge-api.pnj.io`) |
+| Mi Hồng | API trên website Mi Hồng (`api.mihong.vn`) |
+| Bảo Tín Mạnh Hải | Trang bảng giá `baotinmanhhai.vn/bang-gia-vang` |
 | Phú Quý | Bảng giá trên `phuquygroup.vn` |
-| SJC | Bảng giá SJC tổng hợp trên `giavang.org`. Dự phòng: dữ liệu giá vàng của VnExpress |
+| Ngọc Thẩm | Bảng giá trên `ngoctham.com/bang-gia-vang` |
 | DOJI | Bảng giá DOJI trên `giavang.org` |
 | Bảo Tín Minh Châu | Bảng giá BTMC trên `giavang.org` |
-| Tỉ giá | Vietcombank. Dự phòng: `open.er-api.com` (tỉ giá trung bình) |
-| Giá thế giới | `gold-api.com` |
+| SJC | Bảng giá SJC trên `giavang.org`. Dự phòng: dữ liệu giá vàng của VnExpress |
 
-Website của SJC, DOJI và Bảo Tín Minh Châu chặn truy cập từ máy chủ ở nước ngoài, trong đó có GitHub. Vì vậy giá của ba đơn vị này được lấy qua trang tổng hợp giavang.org.
+Website của DOJI, Bảo Tín Minh Châu và SJC chặn truy cập từ ngoài Việt Nam, trong đó có máy chủ GitHub. Vì vậy giá của ba đơn vị này được lấy qua trang tổng hợp giavang.org, và trang ghi rõ "qua giavang.org" ở những dòng đó.
 
 ## Lưu ý
 
@@ -87,7 +87,7 @@ Website của SJC, DOJI và Bảo Tín Minh Châu chặn truy cập từ máy ch
 Yêu cầu Node.js 20 trở lên. Dự án không dùng thư viện ngoài.
 
 ```bash
-npm test          # chạy test bộ đọc dữ liệu, lịch cập nhật, quy đổi tiền
+npm test          # chạy test bộ đọc dữ liệu và lịch cập nhật
 npm run build     # lấy giá thật, tạo thư mục dist/
 npm run preview   # xem dist/ tại http://localhost:8080
 ```
@@ -99,7 +99,6 @@ site/               trang web tĩnh
   index.html, styles.css, app.js
   sources.js        nguồn dữ liệu + bộ đọc (dùng chung cho trình duyệt và máy chủ)
   schedule.js       tính giờ cập nhật tiếp theo
-  convert.js        quy đổi tiền tệ
 scripts/build.mjs   lấy dữ liệu và tạo dist/
 test/               test + dữ liệu mẫu thật trong test/fixtures
 ```
