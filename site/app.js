@@ -1,11 +1,13 @@
-import { BROWSER_FETCHERS, CHI_PER_LUONG, CURRENCIES, SHOPS, collectAll, worldToVndPerLuong } from './sources.js';
+import { BROWSER_FETCHERS, CHI_PER_LUONG, CURRENCIES, SHOPS, collectAll, vnDate, worldToVndPerLuong } from './sources.js';
 import { INTERVALS, MODES, describeRun, isTime, nextRun, normalizeTimes } from './schedule.js';
 import { convert, parseAmount } from './convert.js';
 
 const DATA_URL = 'data/latest.json';
+const BASE_TITLE = document.title;
 const SETTINGS_KEY = 'letseegold:settings:v1';
 const PRICES_KEY = 'letseegold:prices:v1';
 const TICK_MS = 20_000;
+const OLD_MS = 36 * 3600 * 1000;
 
 const DEFAULTS = {
   mode: 'times',
@@ -16,7 +18,6 @@ const DEFAULTS = {
   notify: false,
   notifyOnlyChange: false,
   unit: 'luong',
-  tab: 'all',
   compare: 'sjc',
   conv: { amount: '100', from: 'USD', to: 'VND' },
 };
@@ -24,10 +25,18 @@ const DEFAULTS = {
 const COMPARE = {
   sjc: {
     label: 'Vàng miếng SJC',
+    short: 'Miếng SJC',
+    noun: 'vàng miếng SJC',
     title: 'Giá vàng miếng SJC tại các cửa hàng',
     match: (n) => /SJC/i.test(n) && !/nhẫn|nữ trang|trang sức/i.test(n),
   },
-  ring: { label: 'Nhẫn trơn 9999', title: 'Giá nhẫn trơn 9999 tại các cửa hàng', match: (n) => /nhẫn/i.test(n) },
+  ring: {
+    label: 'Nhẫn trơn 9999',
+    short: 'Nhẫn 9999',
+    noun: 'nhẫn trơn 9999',
+    title: 'Giá nhẫn trơn 9999 tại các cửa hàng',
+    match: (n) => /nhẫn/i.test(n),
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -59,7 +68,6 @@ function sanitize(raw) {
   s.notify = Boolean(s.notify);
   s.notifyOnlyChange = Boolean(s.notifyOnlyChange);
   if (!['luong', 'chi'].includes(s.unit)) s.unit = 'luong';
-  if (s.tab !== 'all' && !SHOPS.some((x) => x.id === s.tab)) s.tab = 'all';
   if (!COMPARE[s.compare]) s.compare = 'sjc';
   const codes = ['VND', ...CURRENCIES.map((c) => c.code)];
   s.conv = { ...DEFAULTS.conv, ...(s.conv || {}) };
@@ -79,6 +87,7 @@ const state = {
   view: null,
   changed: new Set(),
   nextRunAt: null,
+  openShop: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -91,8 +100,14 @@ const pad = (n) => String(n).padStart(2, '0');
 const nf0 = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
 const nf2 = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const unitDiv = () => (settings.unit === 'chi' ? CHI_PER_LUONG : 1);
-const unitLabel = () => (settings.unit === 'chi' ? 'đ/chỉ' : 'đ/lượng');
+const fmtToday = new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+const CHEVRON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M9.3 6.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 1 1-1.4-1.4L13.6 12 9.3 7.7a1 1 0 0 1 0-1.4z"/></svg>';
+
+// Gold prices are shown in thousands of đồng, as on the shops' own boards
+// ("141.800" nghìn đồng/lượng instead of 141.800.000 đ).
+const PRICE_SCALE = 1000;
+const unitDiv = () => (settings.unit === 'chi' ? CHI_PER_LUONG : 1) * PRICE_SCALE;
+const unitLabel = () => (settings.unit === 'chi' ? 'nghìn đồng/chỉ' : 'nghìn đồng/lượng');
 
 function fmtPrice(v) {
   return v == null ? '—' : nf0.format(Math.round(v / unitDiv()));
@@ -214,10 +229,10 @@ function refresh(reason) {
 function render() {
   if (!state.view) return;
   renderStatus();
-  renderTabs();
-  renderWorld();
+  renderCompareTabs();
+  renderSummary();
   renderCompare();
-  renderShops();
+  renderShopDialog();
   renderFx();
   renderConverter();
   renderSources();
@@ -232,164 +247,209 @@ function renderStatus() {
   let text = `Cập nhật lúc ${fmtTime(state.checkedAt?.toISOString(), false)} · ${ok}/${total} cửa hàng có giá`;
   if (state.snapshotError) text += ' · chưa tải được dữ liệu máy chủ';
   $('#status-text').textContent = text;
+  $('#today').textContent = fmtToday.format(state.checkedAt || new Date());
 }
 
 function renderSchedule() {
   const el = $('#schedule-text');
+  let text;
   if (settings.mode === 'manual') {
-    el.textContent = 'Lịch: thủ công – bấm “Cập nhật” để lấy giá mới.';
+    text = 'Cập nhật thủ công: bấm nút ⟳ để lấy giá mới.';
   } else if (!state.nextRunAt) {
-    el.textContent = 'Lịch: chưa có giờ cập nhật nào – mở “Lịch cập nhật” để thêm.';
+    text = 'Chưa đặt giờ tự cập nhật.';
   } else {
     const what =
       settings.mode === 'times'
-        ? `vào ${settings.times.join(', ')} mỗi ngày`
-        : `mỗi ${settings.every >= 60 ? `${settings.every / 60} giờ` : `${settings.every} phút`} từ ${settings.from} đến ${settings.to}`;
-    el.textContent = `Lịch: ${what} · lần tới ${describeRun(state.nextRunAt)}${settings.notify ? ' · có thông báo' : ''}`;
+        ? `lúc ${settings.times.join(', ')}`
+        : `mỗi ${settings.every >= 60 ? `${settings.every / 60} giờ` : `${settings.every} phút`}, ${settings.from}–${settings.to}`;
+    text = `Tự cập nhật ${what} · lần tới ${describeRun(state.nextRunAt)}${settings.notify ? ' · có thông báo' : ''}`;
   }
+  el.innerHTML = `${esc(text)} <button type="button" class="link" data-open-settings>Đổi lịch</button>`;
 }
 
-function renderTabs() {
-  const tabs = [{ id: 'all', name: 'So sánh giá' }, ...SHOPS];
-  $('#shop-tabs').innerHTML = tabs
-    .map((t) => {
-      const s = t.id === 'all' ? null : state.view.gold[t.id];
-      const warn = s && (!s.ok || s.stale) ? '<span class="warn-mark" title="Dữ liệu chưa mới">⚠</span>' : '';
-      return `<button class="chip" role="tab" type="button" data-tab="${t.id}" aria-selected="${settings.tab === t.id}">${esc(t.name)}${warn}</button>`;
-    })
+function renderCompareTabs() {
+  $('#compare-tabs').innerHTML = Object.entries(COMPARE)
+    .map(
+      ([id, c]) =>
+        `<button type="button" role="tab" class="tab" data-compare="${id}" aria-selected="${settings.compare === id}">` +
+        `<span class="hide-sm">${c.label}</span><span class="show-sm">${c.short}</span></button>`,
+    )
     .join('');
-}
-
-function renderWorld() {
-  const el = $('#world-gold');
-  const w = state.view.world;
-  const usd = state.view.fx?.rates?.USD;
-  if (!w?.ok) {
-    el.hidden = true;
-    return;
-  }
-  const vnd = worldToVndPerLuong(w.usdPerOunce, usd?.sell || usd?.transfer);
-  const sjcSell = pick(state.view.gold.sjc, COMPARE.sjc.match)?.sell;
-  const ref = state.view.ref?.prices?.['world:xau']?.[0];
-  const parts = [
-    `<span>Thế giới: <b>${nf2.format(w.usdPerOunce)} USD/oz</b>${change(w.usdPerOunce, ref, (d) => nf2.format(Math.abs(d)))}</span>`,
-  ];
-  if (vnd) parts.push(`<span>≈ <b>${fmtPrice(vnd)}</b> ${unitLabel()} (quy đổi theo giá bán USD)</span>`);
-  if (vnd && sjcSell) {
-    const gap = sjcSell - vnd;
-    parts.push(`<span>SJC ${gap >= 0 ? 'cao' : 'thấp'} hơn thế giới: <b>${fmtPrice(Math.abs(gap))}</b></span>`);
-  }
-  el.innerHTML = parts.join('');
-  el.hidden = false;
+  $('#board-title').textContent = COMPARE[settings.compare].title;
 }
 
 function pick(shop, match) {
   return shop?.ok ? shop.items.find((i) => match(i.name)) : null;
 }
 
-function renderCompare() {
-  const el = $('#compare');
-  if (settings.tab !== 'all') {
-    el.hidden = true;
-    return;
-  }
+/** Rows of the comparison table for the selected gold type, plus the best prices among them. */
+function compareRows() {
   const c = COMPARE[settings.compare];
-  const ref = state.view.ref?.prices || {};
-  const rows = SHOPS.map((s) => ({ shop: s, data: state.view.gold[s.id], item: pick(state.view.gold[s.id], c.match) })).filter(
-    (r) => r.item,
-  );
+  const rows = SHOPS.map((shop) => ({ shop, data: state.view.gold[shop.id] }))
+    .map((r) => ({ ...r, item: pick(r.data, c.match) }))
+    .filter((r) => r.item);
   const buys = rows.map((r) => r.item.buy).filter((v) => v != null);
   const sells = rows.map((r) => r.item.sell).filter((v) => v != null);
-  const bestBuy = buys.length > 1 ? Math.max(...buys) : null;
-  const bestSell = sells.length > 1 ? Math.min(...sells) : null;
-  const seg = Object.entries(COMPARE)
-    .map(([id, x]) => `<button type="button" role="radio" data-compare="${id}" aria-checked="${settings.compare === id}">${x.label}</button>`)
-    .join('');
-  const body = rows.length
+  return {
+    rows,
+    bestBuy: buys.length > 1 ? Math.max(...buys) : null,
+    bestSell: sells.length > 1 ? Math.min(...sells) : null,
+  };
+}
+
+function shopNames(rows) {
+  const names = rows.map((r) => r.shop.name);
+  return names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2}` : names.join(', ');
+}
+
+function renderSummary() {
+  const { rows, bestBuy, bestSell } = compareRows();
+  const tiles = [];
+  if (bestBuy != null) {
+    tiles.push(stat('Mua vào cao nhất', fmtPrice(bestBuy), esc(shopNames(rows.filter((r) => r.item.buy === bestBuy)))));
+  }
+  if (bestSell != null) {
+    tiles.push(stat('Bán ra thấp nhất', fmtPrice(bestSell), esc(shopNames(rows.filter((r) => r.item.sell === bestSell)))));
+  }
+  const w = state.view.world;
+  const usd = state.view.fx?.rates?.USD;
+  const vnd = w?.ok ? worldToVndPerLuong(w.usdPerOunce, usd?.sell || usd?.transfer) : null;
+  if (vnd) {
+    const ref = state.view.ref?.prices?.['world:xau']?.[0];
+    const pct = (d) => `${nf2.format(Math.abs(d))} (${nf2.format((Math.abs(d) / ref) * 100)}%)`;
+    const usdLine = `${nf2.format(w.usdPerOunce)} USD/oz${change(w.usdPerOunce, ref, pct)}`;
+    const gap =
+      bestSell != null ? `<br>Trong nước ${bestSell >= vnd ? 'cao' : 'thấp'} hơn <b>${fmtPrice(Math.abs(bestSell - vnd))}</b>` : '';
+    tiles.push(stat('Thế giới quy đổi', fmtPrice(vnd), usdLine + gap, 'world'));
+  }
+  document.title =
+    bestBuy != null && bestSell != null
+      ? `${fmtPrice(bestBuy)} / ${fmtPrice(bestSell)} · ${COMPARE[settings.compare].label} – LetSeeGold`
+      : BASE_TITLE;
+  $('#summary').innerHTML = tiles.join('');
+  $('#summary').hidden = tiles.length === 0;
+}
+
+function stat(label, value, sub, cls = '') {
+  return `<div class="stat ${cls}"><span class="stat-label">${label}</span><span class="stat-value">${value}</span><span class="stat-sub">${sub}</span></div>`;
+}
+
+/** "Chính hãng · 10:08" – where the price came from and when the shop posted it. */
+function sourceMeta(data) {
+  const when = data.sourceTime || data.fetchedAt;
+  const today = when && vnDate(when) === vnDate(new Date());
+  const old = when && Date.now() - new Date(when).getTime() > OLD_MS;
+  const src = data.via
+    ? `<span class="src" title="Lấy qua trang tổng hợp ${esc(data.via)}">qua ${esc(data.via)}</span>`
+    : '<span class="src official" title="Lấy trực tiếp từ website của cửa hàng">Chính hãng</span>';
+  const time = when ? `<span class="time${old ? ' old' : ''}" title="${old ? 'Cửa hàng chưa đổi giá hơn một ngày' : 'Giờ cửa hàng niêm yết'}">${fmtTime(when, !today)}</span>` : '';
+  const stale = data.stale ? `<span class="badge stale" title="${esc(data.error || '')}">Dữ liệu cũ</span>` : '';
+  return `${src}${time}${stale}`;
+}
+
+function priceCell(label, value, ref, best) {
+  const cls = value != null && value === best ? ' best' : '';
+  return `<td class="num price${cls}" data-label="${label}"><span class="val">${fmtPrice(value)}</span>${change(value, ref)}</td>`;
+}
+
+function renderCompare() {
+  const { rows, bestBuy, bestSell } = compareRows();
+  const ref = state.view.ref?.prices || {};
+  $('#compare-body').innerHTML = rows.length
     ? rows
         .map(({ shop, data, item }) => {
+          const r = ref[item.key] || [];
           const spread = item.buy != null && item.sell != null ? fmtPrice(item.sell - item.buy) : '—';
-          const source = data.via ? `qua ${data.via}` : 'website chính hãng';
-          const time = fmtTime(data.sourceTime || data.fetchedAt);
-          return `<tr>
-            <td><button type="button" class="link" data-tab="${shop.id}">${esc(shop.name)}</button>
-              <small class="muted product">${esc(item.name)}</small>
-              <small class="src${data.via ? '' : ' official'}">${esc(source)}${time ? ` · ${time}` : ''}${data.stale ? ' · dữ liệu cũ' : ''}</small></td>
-            <td class="num${item.buy != null && item.buy === bestBuy ? ' best' : ''}" data-label="Mua">${fmtPrice(item.buy)}${change(item.buy, ref[item.key]?.[0])}</td>
-            <td class="num${item.sell != null && item.sell === bestSell ? ' best' : ''}" data-label="Bán">${fmtPrice(item.sell)}${change(item.sell, ref[item.key]?.[1])}</td>
-            <td class="num muted spread">${spread}</td>
+          return `<tr data-shop="${shop.id}" class="${state.changed.has(item.key) ? 'flash' : ''}">
+            <th scope="row" class="shop-cell">
+              <button type="button" class="shop-link" data-shop="${shop.id}" aria-haspopup="dialog" title="Xem bảng giá đầy đủ của ${esc(shop.name)}">
+                <span>${esc(shop.name)}</span>${CHEVRON}
+              </button>
+              <span class="meta"><span class="product">${esc(item.name)}</span>${sourceMeta(data)}</span>
+            </th>
+            ${priceCell('Mua', item.buy, r[0], bestBuy)}
+            ${priceCell('Bán', item.sell, r[1], bestSell)}
+            <td class="num spread">${spread}</td>
           </tr>`;
         })
         .join('')
     : '<tr><td colspan="4" class="muted">Chưa có dữ liệu.</td></tr>';
-  el.innerHTML = `
-    <div class="compare-head">
-      <h2>${c.title}</h2>
-      <div class="seg" role="radiogroup" aria-label="Loại vàng so sánh">${seg}</div>
-    </div>
-    <div class="table-wrap">
-      <table class="table compare-table">
-        <thead><tr><th>Cửa hàng</th><th class="num">Mua vào</th><th class="num">Bán ra</th><th class="num spread">Chênh lệch</th></tr></thead>
-        <tbody>${body}</tbody>
-      </table>
-    </div>
-    <p class="muted small">Đơn vị ${unitLabel()}.${refNote()} <span class="best-key">Ô nổi bật</span>: tiệm mua vào cao nhất / bán ra thấp nhất. Bấm tên cửa hàng để xem toàn bộ bảng giá của tiệm.</p>`;
-  el.hidden = false;
+
+  const missing = SHOPS.filter((s) => !rows.some((r) => r.shop.id === s.id));
+  $('#legend').innerHTML = [
+    `Đơn vị: <b>${unitLabel()}</b>.`,
+    refNote(),
+    bestBuy != null || bestSell != null ? '<span class="best-key">Ô vàng</span> là giá tốt nhất: mua vào cao nhất, bán ra thấp nhất.' : '',
+    missing.length
+      ? `Chưa có giá ${COMPARE[settings.compare].noun} của ${missing
+          .map((s) => `<button type="button" class="link" data-shop="${s.id}">${esc(s.name)}</button>`)
+          .join(', ')}.`
+      : '',
+    'Bấm tên cửa hàng để xem toàn bộ bảng giá.',
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 function refNote() {
   const ref = state.view.ref;
   if (!ref) return '';
   const [y, m, d] = ref.date.split('-');
-  return ` ▲▼ so với giá cuối ngày ${d}/${m}/${y}.`;
+  return `▲▼ so với giá cuối ngày ${d}/${m}/${y}.`;
 }
 
-function renderShops() {
-  const shop = SHOPS.find((s) => s.id === settings.tab);
-  const note = $('#ref-note');
-  note.hidden = !shop || !state.view.ref;
-  note.textContent = `${refNote().trim()} Đơn vị: ${unitLabel()}.`;
-  $('#shops').innerHTML = shop ? renderShop(shop, state.view.gold[shop.id], state.view.ref?.prices || {}) : '';
+// ---------------------------------------------------------------------------
+// Shop price board (dialog)
+
+function openShop(id) {
+  state.openShop = id;
+  renderShopDialog();
+  const dlg = $('#shop-dialog');
+  if (!dlg.open) dlg.showModal();
 }
 
-function renderShop(shop, data, refPrices) {
-  const badges = [];
-  if (data?.live) badges.push('<span class="badge live" title="Lấy trực tiếp từ website của cửa hàng">Trực tiếp</span>');
-  if (data?.stale) badges.push(`<span class="badge stale" title="${esc(data.error || '')}">Dữ liệu cũ</span>`);
-  const sub = [data?.region, data?.via ? `nguồn ${data.via}` : null].filter(Boolean).join(' · ');
-  const time = data?.ok ? fmtTime(data.sourceTime || data.fetchedAt) : '';
+function renderShopDialog() {
+  const shop = SHOPS.find((s) => s.id === state.openShop);
+  if (!shop || !state.view) return;
+  const data = state.view.gold[shop.id];
+  const refPrices = state.view.ref?.prices || {};
+  const badges = data?.live ? '<span class="badge live" title="Trình duyệt vừa lấy trực tiếp từ website của cửa hàng">Trực tiếp</span>' : '';
+  const sub = [shop.fullName, data?.region].filter(Boolean).join(' · ');
 
   let body;
   if (!data?.ok) {
-    body = `<div class="shop-error">Chưa lấy được giá${data?.error ? ` (${esc(data.error)})` : ''}. Hệ thống sẽ thử lại ở lần cập nhật sau.</div>`;
+    body = `<p class="shop-error">Chưa lấy được giá${data?.error ? ` (${esc(data.error)})` : ''}. Hệ thống sẽ thử lại ở lần cập nhật sau.</p>`;
   } else {
     const rows = data.items
       .map((i) => {
         const r = refPrices[i.key] || [];
-        const flash = state.changed.has(i.key) ? ' flash' : '';
-        return `<tr class="${flash}">
-          <td>${esc(i.name)}</td>
-          <td class="num" data-label="Mua">${fmtPrice(i.buy)}${change(i.buy, r[0])}</td>
-          <td class="num" data-label="Bán">${fmtPrice(i.sell)}${change(i.sell, r[1])}</td>
+        return `<tr class="${state.changed.has(i.key) ? 'flash' : ''}">
+          <th scope="row">${esc(i.name)}</th>
+          ${priceCell('Mua', i.buy, r[0])}
+          ${priceCell('Bán', i.sell, r[1])}
         </tr>`;
       })
       .join('');
-    body = `<div class="table-wrap"><table class="table">
+    body = `<div class="table-wrap"><table class="table shop-table">
       <thead><tr><th>Loại vàng</th><th class="num">Mua vào</th><th class="num">Bán ra</th></tr></thead>
       <tbody>${rows}</tbody></table></div>`;
-    if (data.note) body += `<div class="shop-note">${esc(data.note)}</div>`;
+    if (data.note) body += `<p class="legend">${esc(data.note)}</p>`;
   }
 
-  return `<article class="shop" id="shop-${shop.id}">
-    <header class="shop-head">
+  $('#shop-dialog-body').innerHTML = `
+    <header class="dialog-head">
       <div>
-        <h3><a href="${esc(shop.website)}" target="_blank" rel="noopener" title="${esc(shop.fullName)}">${esc(shop.name)}</a>${badges.join('')}</h3>
-        ${sub ? `<div class="muted small">${esc(sub)}</div>` : ''}
+        <h2 id="shop-dialog-title">${esc(shop.name)} ${badges}</h2>
+        <p class="muted small">${esc(sub)}</p>
       </div>
-      ${time ? `<div class="shop-meta">Giá lúc<br><b>${time}</b></div>` : ''}
+      <button type="button" class="btn btn-ghost icon" data-close-dialog aria-label="Đóng">✕</button>
     </header>
-    ${body}
-  </article>`;
+    <div class="sheet-body">
+      ${data?.ok ? `<p class="meta">${sourceMeta(data)}</p>` : ''}
+      ${body}
+      <p class="legend">Đơn vị: <b>${unitLabel()}</b>. ${refNote()}
+        <a href="${esc(shop.website)}" target="_blank" rel="noopener">Xem trên website ${esc(shop.name)} ↗</a></p>
+    </div>`;
 }
 
 function renderFx() {
@@ -403,8 +463,8 @@ function renderFx() {
     const [refTransfer, refSell] = ref[`fx:${c.code}`] || [];
     const fmt = (d) => fmtRate(Math.abs(d));
     return `<tr>
-      <td><div class="cur"><span class="flag" aria-hidden="true">${c.flag}</span><div><b>${c.code}</b><small>${esc(c.name)}</small></div></div></td>
-      <td class="num">${fmtRate(r?.cash)}</td>
+      <th scope="row"><div class="cur"><span class="flag" aria-hidden="true">${c.flag}</span><div><b>${c.code}</b><small>${esc(c.name)}</small></div></div></th>
+      <td class="num cash">${fmtRate(r?.cash)}</td>
       <td class="num">${fmtRate(r?.transfer)}${change(r?.transfer, refTransfer, fmt)}</td>
       <td class="num">${fmtRate(r?.sell)}${change(r?.sell, refSell, fmt)}</td>
     </tr>`;
@@ -428,7 +488,7 @@ const legNote = (l) => `1 ${l.code} = ${fmtRate(l.rate)} ₫ (${SIDE[l.side]})`;
 function setupConverter() {
   const opts = CONV_CODES.map((code) => {
     const c = CURRENCIES.find((x) => x.code === code);
-    return `<option value="${code}">${c ? `${c.flag} ${code} – ${c.name}` : '🇻🇳 VND – Việt Nam đồng'}</option>`;
+    return `<option value="${code}" title="${c ? c.name : 'Việt Nam đồng'}">${c ? c.flag : '🇻🇳'} ${code}</option>`;
   }).join('');
   $('#conv-from').innerHTML = opts;
   $('#conv-to').innerHTML = opts;
@@ -663,22 +723,30 @@ function setupControls() {
     });
   });
 
-  // Tabs and compare buttons are re-rendered, so listen on the containers.
+  // Table rows and tabs are re-rendered, so listen on the document.
   document.addEventListener('click', (e) => {
-    const tab = e.target.closest('[data-tab]');
-    if (tab) {
-      settings.tab = tab.dataset.tab;
-      saveSettings();
-      render();
-      if (tab.classList.contains('link')) $('#shops').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
+    if (e.target.closest('a')) return;
+    const shop = e.target.closest('[data-shop]');
+    if (shop) return openShop(shop.dataset.shop);
     const cmp = e.target.closest('[data-compare]');
     if (cmp) {
       settings.compare = cmp.dataset.compare;
       saveSettings();
+      renderCompareTabs();
+      renderSummary();
       renderCompare();
+      return;
     }
+    if (e.target.closest('[data-open-settings]')) return openSettings();
+    if (e.target.closest('[data-close-dialog]')) $('#shop-dialog').close();
+  });
+
+  // A click on the backdrop (outside the sheet) closes the price board.
+  $('#shop-dialog').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.close();
+  });
+  $('#shop-dialog').addEventListener('close', () => {
+    state.openShop = null;
   });
 
   document.addEventListener('visibilitychange', () => {

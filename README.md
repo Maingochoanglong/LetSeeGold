@@ -6,15 +6,15 @@ Trang web xem **giá vàng mua vào / bán ra** tại các cửa hàng uy tín v
 
 ## Tính năng
 
-- **Giá vàng miếng SJC tại các cửa hàng** là màn hình chính: PNJ, Mi Hồng, Bảo Tín Mạnh Hải, Phú Quý, Ngọc Thẩm, DOJI, Bảo Tín Minh Châu, SJC. Mỗi dòng có:
-  - giá mua vào, bán ra và mức tăng/giảm (▲▼) so với cuối ngày hôm trước;
-  - nguồn: website chính hãng hay qua trang tổng hợp;
-  - giờ cửa hàng niêm yết.
-
-  Tiệm mua vào cao nhất và bán ra thấp nhất được tô nổi bật. Có thể chuyển sang so sánh nhẫn trơn 9999.
-- **Bảng giá đầy đủ của từng tiệm:** bấm tên tiệm để xem.
-- **Giá vàng thế giới** (USD/oz), quy đổi ra đ/lượng, kèm chênh lệch so với SJC.
-- **Đổi đơn vị** giữa đ/lượng và đ/chỉ.
+- **Giá vàng miếng SJC tại các cửa hàng** là màn hình chính: PNJ, Mi Hồng, Bảo Tín Mạnh Hải, Phú Quý, Ngọc Thẩm, DOJI, Bảo Tín Minh Châu, SJC.
+  - Đầu bảng có 3 ô tóm tắt: **mua vào cao nhất**, **bán ra thấp nhất** (kèm tên tiệm) và **giá thế giới quy đổi**.
+  - Mỗi dòng có giá mua vào, bán ra, chênh lệch mua–bán và mức tăng/giảm (▲▼) so với cuối ngày hôm trước.
+  - Mỗi dòng ghi nguồn (✓ chính hãng hay qua trang tổng hợp) và giờ cửa hàng niêm yết. Giá chưa đổi hơn một ngày được tô màu cảnh báo.
+  - Giá tốt nhất được tô vàng. Có thể chuyển sang so sánh nhẫn trơn 9999.
+  - Tiêu đề tab trình duyệt hiện luôn giá tốt nhất, ví dụ `142.000 / 143.500 · Vàng miếng SJC`.
+- **Bảng giá đầy đủ của từng tiệm:** bấm vào dòng của tiệm. Trên điện thoại, bảng mở dạng tấm trượt từ dưới lên.
+- **Giá vàng thế giới** (USD/oz, ▲▼ kèm %), quy đổi ra giá trong nước, kèm chênh lệch.
+- **Đơn vị** giống bảng giá của các tiệm: **nghìn đồng/lượng** (ví dụ 141.800), có thể đổi sang nghìn đồng/chỉ.
 - **Tỉ giá Vietcombank** cho USD, JPY, KRW: mua tiền mặt, mua chuyển khoản, bán ra.
 - **Quy đổi tiền tệ** giữa VND, USD, JPY và KRW theo giá ngân hàng mua vào / bán ra.
 - **Lịch cập nhật** do người dùng tự chọn và được lưu lại trên máy:
