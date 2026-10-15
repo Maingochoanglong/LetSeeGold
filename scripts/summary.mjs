@@ -19,6 +19,4 @@ lines.push(
     fx?.ok ? Object.entries(fx.rates).map(([c, r]) => `${c} ${r.transfer}`).join(', ') : ''
   } |`,
 );
-const w = snap.world;
-lines.push(`| Thế giới | ${w?.ok ? '✅' : `❌ ${w?.error}`} | | ${w?.ok ? `${w.usdPerOunce} USD/oz` : ''} |`);
 console.log(lines.join('\n'));

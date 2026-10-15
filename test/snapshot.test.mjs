@@ -7,7 +7,7 @@ const fail = (fetchedAt, error = 'HTTP 503') => ({ ok: false, fetchedAt, error }
 const it = (key, buy, sell) => ({ key, name: key, buy, sell });
 
 function snap(generatedAt, gold, extra = {}) {
-  return { generatedAt, gold, fx: null, world: null, ...extra };
+  return { generatedAt, gold, fx: null, ...extra };
 }
 
 test('keeps the last good data of a failing source, marked stale', () => {
@@ -57,11 +57,10 @@ test('no reference without history', () => {
   assert.equal(out.version, 1);
 });
 
-test('pricesOf flattens gold, fx and world', () => {
+test('pricesOf flattens gold and fx', () => {
   const p = pricesOf({
     gold: { a: ok('x', [it('a:1', 1, 2)]), b: fail('x') },
     fx: { ok: true, rates: { JPY: { cash: 1, transfer: 2, sell: 3 } } },
-    world: { ok: true, usdPerOunce: 4000 },
   });
-  assert.deepEqual(p, { 'a:1': [1, 2], 'fx:JPY': [2, 3], 'world:xau': [4000, null] });
+  assert.deepEqual(p, { 'a:1': [1, 2], 'fx:JPY': [2, 3] });
 });

@@ -14,7 +14,6 @@ export function pricesOf(snapshot) {
   for (const [code, r] of Object.entries(snapshot?.fx?.rates || {})) {
     prices[`fx:${code}`] = [r.transfer, r.sell];
   }
-  if (snapshot?.world?.usdPerOunce) prices['world:xau'] = [snapshot.world.usdPerOunce, null];
   return prices;
 }
 
@@ -34,7 +33,6 @@ export function mergeSnapshot(fresh, prev, now = Date.now()) {
     generatedAt: fresh.generatedAt,
     gold,
     fx: withFallback(fresh.fx, prev?.fx, now),
-    world: withFallback(fresh.world, prev?.world, now),
   };
 
   // Reference prices for the ▲/▼ column: the last snapshot of the previous day.

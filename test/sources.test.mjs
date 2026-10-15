@@ -14,11 +14,9 @@ import {
   parsePnj,
   parseVcbJson,
   parseVcbXml,
-  parseWorldGold,
   usDateTime,
   vnDate,
   vnDateTime,
-  worldToVndPerLuong,
 } from '../site/sources.js';
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
@@ -101,13 +99,6 @@ test('open.er-api fallback gives mid rates in VND', () => {
   assert.equal(rates.USD.transfer, 26214);
   assert.equal(rates.USD.cash, null);
   assert.equal(rates.JPY.sell, Math.round((26214 / 161.19) * 100) / 100);
-});
-
-test('world gold conversion', () => {
-  const { usdPerOunce } = parseWorldGold(json('gold-api.json'));
-  assert.equal(usdPerOunce, 4195.6);
-  // 1 lượng = 37.5 g = 1.20565 oz
-  assert.equal(worldToVndPerLuong(4195.6, 26070), Math.round(((4195.6 * 37.5) / 31.1034768) * 26070));
 });
 
 test('parsers reject empty or foreign payloads', () => {

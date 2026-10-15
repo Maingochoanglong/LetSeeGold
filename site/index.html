@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>LetSeeGold – Giá vàng & tỉ giá hôm nay</title>
-  <meta name="description" content="Giá vàng miếng SJC và vàng nhẫn tại PNJ, Mi Hồng, Bảo Tín Mạnh Hải, Phú Quý, Ngọc Thẩm, DOJI, Bảo Tín Minh Châu và tỉ giá USD, JPY, KRW. Tự cập nhật theo khung giờ bạn chọn.">
+  <title>LetSeeGold – Giá vàng SJC & tỉ giá hôm nay</title>
+  <meta name="description" content="Giá vàng miếng SJC tại PNJ, Mi Hồng, Bảo Tín Mạnh Hải, Phú Quý, Ngọc Thẩm, DOJI, Bảo Tín Minh Châu, SJC và tỉ giá USD, JPY, KRW. Tự cập nhật theo khung giờ bạn chọn.">
   <meta name="theme-color" content="#8a6a05">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-192.png">
@@ -36,20 +36,19 @@
 
   <main class="wrap">
     <section class="intro" aria-live="polite">
-      <h1>Giá vàng hôm nay <span class="today" id="today"></span></h1>
+      <h1>Giá vàng SJC hôm nay <span class="today" id="today"></span></h1>
       <p class="status-line"><span class="dot" id="status-dot"></span><span id="status-text">Đang tải dữ liệu…</span></p>
       <p class="status-line muted" id="schedule-text"></p>
     </section>
 
     <section class="panel board" aria-labelledby="board-title">
       <div class="board-head">
-        <div class="tabs" role="tablist" aria-label="Loại vàng" id="compare-tabs"></div>
+        <h2 id="board-title"><span class="hide-sm">Vàng miếng SJC tại các cửa hàng</span><span class="show-sm">Theo cửa hàng</span></h2>
         <div class="seg" role="radiogroup" aria-label="Đơn vị">
           <button type="button" role="radio" data-unit="luong" aria-checked="true">Lượng</button>
           <button type="button" role="radio" data-unit="chi" aria-checked="false">Chỉ</button>
         </div>
       </div>
-      <h2 class="sr-only" id="board-title">Giá vàng tại các cửa hàng</h2>
       <div class="summary" id="summary"></div>
       <div class="table-wrap">
         <table class="table compare-table" id="compare">
@@ -116,10 +115,6 @@
       <p id="sources"></p>
     </footer>
   </main>
-
-  <dialog id="shop-dialog" class="dialog sheet" aria-labelledby="shop-dialog-title">
-    <div id="shop-dialog-body"></div>
-  </dialog>
 
   <dialog id="settings" class="dialog">
     <form method="dialog" id="settings-form">

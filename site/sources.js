@@ -7,8 +7,6 @@
 // All gold prices are normalised to VND per lượng (1 lượng = 10 chỉ = 37.5 g).
 
 export const CHI_PER_LUONG = 10;
-export const GRAMS_PER_LUONG = 37.5;
-export const GRAMS_PER_TROY_OUNCE = 31.1034768;
 
 // Shops whose own websites can be read come first; the last three are read
 // from the giavang.org mirror because their sites refuse servers abroad.
@@ -75,7 +73,6 @@ export const URLS = {
   vcbXml: 'https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx',
   vcbJson: 'https://www.vietcombank.com.vn/api/exchangerates?date=',
   erApi: 'https://open.er-api.com/v6/latest/USD',
-  worldGold: 'https://api.gold-api.com/price/XAU',
   phuquy: 'https://phuquygroup.vn/',
   btmh: 'https://baotinmanhhai.vn/bang-gia-vang.data',
   ngoctham: 'https://ngoctham.com/bang-gia-vang/',
@@ -483,19 +480,6 @@ function pickCurrencies(all, what) {
   return rates;
 }
 
-/** gold-api.com: world spot price in USD per troy ounce. */
-export function parseWorldGold(json) {
-  const p = parseNum(json?.price);
-  if (!p || p <= 0) throw new Error('Không đọc được giá vàng thế giới');
-  return { usdPerOunce: Math.round(p * 100) / 100, sourceTime: json?.updatedAt || null };
-}
-
-/** World price converted to VND per lượng with a given USD rate. */
-export function worldToVndPerLuong(usdPerOunce, usdVnd) {
-  if (!usdPerOunce || !usdVnd) return null;
-  return Math.round(((usdPerOunce * GRAMS_PER_LUONG) / GRAMS_PER_TROY_OUNCE) * usdVnd);
-}
-
 // ---------------------------------------------------------------------------
 // Fetching
 
@@ -579,10 +563,6 @@ export function fetchFx() {
   ]);
 }
 
-export async function fetchWorldGold() {
-  return parseWorldGold(await get(URLS.worldGold));
-}
-
 /** Runs a fetcher and turns the outcome into a serialisable status object. */
 export async function settle(run) {
   const fetchedAt = new Date().toISOString();
@@ -593,17 +573,16 @@ export async function settle(run) {
   }
 }
 
-/** Fetches every shop in `fetchers`, plus exchange rates and the world price. */
-export async function collectAll({ fetchers = GOLD_FETCHERS, includeFx = true, includeWorld = true } = {}) {
+/** Fetches every shop in `fetchers`, plus the exchange rates. */
+export async function collectAll({ fetchers = GOLD_FETCHERS, includeFx = true } = {}) {
   const ids = SHOPS.map((s) => s.id).filter((id) => fetchers[id]);
-  const [goldResults, fx, world] = await Promise.all([
+  const [goldResults, fx] = await Promise.all([
     Promise.all(ids.map((id) => settle(fetchers[id]))),
     includeFx ? settle(fetchFx) : null,
-    includeWorld ? settle(fetchWorldGold) : null,
   ]);
   const gold = {};
   ids.forEach((id, i) => {
     gold[id] = goldResults[i];
   });
-  return { generatedAt: new Date().toISOString(), gold, fx, world };
+  return { generatedAt: new Date().toISOString(), gold, fx };
 }

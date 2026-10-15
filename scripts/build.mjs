@@ -53,7 +53,6 @@ for (const [id, s] of Object.entries(snapshot.gold)) {
   console.log(`${id.padEnd(8)} ${s.stale ? '(dữ liệu cũ) ' : ''}${status}`);
 }
 console.log(`fx       ${snapshot.fx?.ok ? `${snapshot.fx.source}: ${Object.keys(snapshot.fx.rates).join(', ')}` : `LỖI: ${snapshot.fx?.error}`}`);
-console.log(`world    ${snapshot.world?.ok ? `${snapshot.world.usdPerOunce} USD/oz` : `LỖI: ${snapshot.world?.error}`}`);
 
 const okCount = Object.values(snapshot.gold).filter((s) => s.ok).length;
 if (!okCount) {

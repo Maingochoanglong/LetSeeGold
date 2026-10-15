@@ -1,4 +1,4 @@
-import { BROWSER_FETCHERS, CHI_PER_LUONG, CURRENCIES, SHOPS, collectAll, vnDate, worldToVndPerLuong } from './sources.js';
+import { BROWSER_FETCHERS, CHI_PER_LUONG, CURRENCIES, SHOPS, collectAll, vnDate } from './sources.js';
 import { INTERVALS, MODES, describeRun, isTime, nextRun, normalizeTimes } from './schedule.js';
 import { convert, parseAmount } from './convert.js';
 
@@ -18,26 +18,11 @@ const DEFAULTS = {
   notify: false,
   notifyOnlyChange: false,
   unit: 'luong',
-  compare: 'sjc',
   conv: { amount: '100', from: 'USD', to: 'VND' },
 };
 
-const COMPARE = {
-  sjc: {
-    label: 'Vàng miếng SJC',
-    short: 'Miếng SJC',
-    noun: 'vàng miếng SJC',
-    title: 'Giá vàng miếng SJC tại các cửa hàng',
-    match: (n) => /SJC/i.test(n) && !/nhẫn|nữ trang|trang sức/i.test(n),
-  },
-  ring: {
-    label: 'Nhẫn trơn 9999',
-    short: 'Nhẫn 9999',
-    noun: 'nhẫn trơn 9999',
-    title: 'Giá nhẫn trơn 9999 tại các cửa hàng',
-    match: (n) => /nhẫn/i.test(n),
-  },
-};
+// The page shows one product per shop: its SJC gold bar.
+const isSjcBar = (name) => /SJC/i.test(name) && !/nhẫn|nữ trang|trang sức/i.test(name);
 
 // ---------------------------------------------------------------------------
 // Storage (wrapped: private mode or blocked storage must not break the page)
@@ -68,7 +53,6 @@ function sanitize(raw) {
   s.notify = Boolean(s.notify);
   s.notifyOnlyChange = Boolean(s.notifyOnlyChange);
   if (!['luong', 'chi'].includes(s.unit)) s.unit = 'luong';
-  if (!COMPARE[s.compare]) s.compare = 'sjc';
   const codes = ['VND', ...CURRENCIES.map((c) => c.code)];
   s.conv = { ...DEFAULTS.conv, ...(s.conv || {}) };
   if (!codes.includes(s.conv.from)) s.conv.from = 'USD';
@@ -87,7 +71,6 @@ const state = {
   view: null,
   changed: new Set(),
   nextRunAt: null,
-  openShop: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -101,7 +84,6 @@ const nf0 = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
 const nf2 = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const fmtToday = new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
-const CHEVRON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M9.3 6.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 1 1-1.4-1.4L13.6 12 9.3 7.7a1 1 0 0 1 0-1.4z"/></svg>';
 
 // Gold prices are shown in thousands of đồng, as on the shops' own boards
 // ("141.800" nghìn đồng/lượng instead of 141.800.000 đ).
@@ -164,13 +146,7 @@ function buildView() {
     const stored = snap.gold?.[shop.id];
     gold[shop.id] = live?.ok ? { ...live, live: true } : stored || live || null;
   }
-  const liveWorld = state.live?.world;
-  return {
-    gold,
-    fx: snap.fx || null,
-    world: liveWorld?.ok ? liveWorld : snap.world || null,
-    ref: snap.ref || null,
-  };
+  return { gold, fx: snap.fx || null, ref: snap.ref || null };
 }
 
 function flatPrices(view) {
@@ -229,10 +205,8 @@ function refresh(reason) {
 function render() {
   if (!state.view) return;
   renderStatus();
-  renderCompareTabs();
   renderSummary();
   renderCompare();
-  renderShopDialog();
   renderFx();
   renderConverter();
   renderSources();
@@ -267,26 +241,14 @@ function renderSchedule() {
   el.innerHTML = `${esc(text)} <button type="button" class="link" data-open-settings>Đổi lịch</button>`;
 }
 
-function renderCompareTabs() {
-  $('#compare-tabs').innerHTML = Object.entries(COMPARE)
-    .map(
-      ([id, c]) =>
-        `<button type="button" role="tab" class="tab" data-compare="${id}" aria-selected="${settings.compare === id}">` +
-        `<span class="hide-sm">${c.label}</span><span class="show-sm">${c.short}</span></button>`,
-    )
-    .join('');
-  $('#board-title').textContent = COMPARE[settings.compare].title;
+function sjcItem(shop) {
+  return shop?.ok ? shop.items.find((i) => isSjcBar(i.name)) : null;
 }
 
-function pick(shop, match) {
-  return shop?.ok ? shop.items.find((i) => match(i.name)) : null;
-}
-
-/** Rows of the comparison table for the selected gold type, plus the best prices among them. */
+/** One row per shop that posts an SJC bar price, plus the best prices among them. */
 function compareRows() {
-  const c = COMPARE[settings.compare];
   const rows = SHOPS.map((shop) => ({ shop, data: state.view.gold[shop.id] }))
-    .map((r) => ({ ...r, item: pick(r.data, c.match) }))
+    .map((r) => ({ ...r, item: sjcItem(r.data) }))
     .filter((r) => r.item);
   const buys = rows.map((r) => r.item.buy).filter((v) => v != null);
   const sells = rows.map((r) => r.item.sell).filter((v) => v != null);
@@ -311,27 +273,14 @@ function renderSummary() {
   if (bestSell != null) {
     tiles.push(stat('Bán ra thấp nhất', fmtPrice(bestSell), esc(shopNames(rows.filter((r) => r.item.sell === bestSell)))));
   }
-  const w = state.view.world;
-  const usd = state.view.fx?.rates?.USD;
-  const vnd = w?.ok ? worldToVndPerLuong(w.usdPerOunce, usd?.sell || usd?.transfer) : null;
-  if (vnd) {
-    const ref = state.view.ref?.prices?.['world:xau']?.[0];
-    const pct = (d) => `${nf2.format(Math.abs(d))} (${nf2.format((Math.abs(d) / ref) * 100)}%)`;
-    const usdLine = `${nf2.format(w.usdPerOunce)} USD/oz${change(w.usdPerOunce, ref, pct)}`;
-    const gap =
-      bestSell != null ? `<br>Trong nước ${bestSell >= vnd ? 'cao' : 'thấp'} hơn <b>${fmtPrice(Math.abs(bestSell - vnd))}</b>` : '';
-    tiles.push(stat('Thế giới quy đổi', fmtPrice(vnd), usdLine + gap, 'world'));
-  }
   document.title =
-    bestBuy != null && bestSell != null
-      ? `${fmtPrice(bestBuy)} / ${fmtPrice(bestSell)} · ${COMPARE[settings.compare].label} – LetSeeGold`
-      : BASE_TITLE;
+    bestBuy != null && bestSell != null ? `${fmtPrice(bestBuy)} / ${fmtPrice(bestSell)} · Giá vàng SJC – LetSeeGold` : BASE_TITLE;
   $('#summary').innerHTML = tiles.join('');
   $('#summary').hidden = tiles.length === 0;
 }
 
-function stat(label, value, sub, cls = '') {
-  return `<div class="stat ${cls}"><span class="stat-label">${label}</span><span class="stat-value">${value}</span><span class="stat-sub">${sub}</span></div>`;
+function stat(label, value, sub) {
+  return `<div class="stat"><span class="stat-label">${label}</span><span class="stat-value">${value}</span><span class="stat-sub">${sub}</span></div>`;
 }
 
 /** "Chính hãng · 10:08" – where the price came from and when the shop posted it. */
@@ -360,11 +309,9 @@ function renderCompare() {
         .map(({ shop, data, item }) => {
           const r = ref[item.key] || [];
           const spread = item.buy != null && item.sell != null ? fmtPrice(item.sell - item.buy) : '—';
-          return `<tr data-shop="${shop.id}" class="${state.changed.has(item.key) ? 'flash' : ''}">
+          return `<tr class="${state.changed.has(item.key) ? 'flash' : ''}">
             <th scope="row" class="shop-cell">
-              <button type="button" class="shop-link" data-shop="${shop.id}" aria-haspopup="dialog" title="Xem bảng giá đầy đủ của ${esc(shop.name)}">
-                <span>${esc(shop.name)}</span>${CHEVRON}
-              </button>
+              <a class="shop-link" href="${esc(shop.website)}" target="_blank" rel="noopener" title="${esc(shop.fullName)} – mở website">${esc(shop.name)}</a>
               <span class="meta"><span class="product">${esc(item.name)}</span>${sourceMeta(data)}</span>
             </th>
             ${priceCell('Mua', item.buy, r[0], bestBuy)}
@@ -380,12 +327,7 @@ function renderCompare() {
     `Đơn vị: <b>${unitLabel()}</b>.`,
     refNote(),
     bestBuy != null || bestSell != null ? '<span class="best-key">Ô vàng</span> là giá tốt nhất: mua vào cao nhất, bán ra thấp nhất.' : '',
-    missing.length
-      ? `Chưa có giá ${COMPARE[settings.compare].noun} của ${missing
-          .map((s) => `<button type="button" class="link" data-shop="${s.id}">${esc(s.name)}</button>`)
-          .join(', ')}.`
-      : '',
-    'Bấm tên cửa hàng để xem toàn bộ bảng giá.',
+    missing.length ? `Chưa có giá vàng miếng SJC của ${missing.map((s) => esc(s.name)).join(', ')}.` : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -396,60 +338,6 @@ function refNote() {
   if (!ref) return '';
   const [y, m, d] = ref.date.split('-');
   return `▲▼ so với giá cuối ngày ${d}/${m}/${y}.`;
-}
-
-// ---------------------------------------------------------------------------
-// Shop price board (dialog)
-
-function openShop(id) {
-  state.openShop = id;
-  renderShopDialog();
-  const dlg = $('#shop-dialog');
-  if (!dlg.open) dlg.showModal();
-}
-
-function renderShopDialog() {
-  const shop = SHOPS.find((s) => s.id === state.openShop);
-  if (!shop || !state.view) return;
-  const data = state.view.gold[shop.id];
-  const refPrices = state.view.ref?.prices || {};
-  const badges = data?.live ? '<span class="badge live" title="Trình duyệt vừa lấy trực tiếp từ website của cửa hàng">Trực tiếp</span>' : '';
-  const sub = [shop.fullName, data?.region].filter(Boolean).join(' · ');
-
-  let body;
-  if (!data?.ok) {
-    body = `<p class="shop-error">Chưa lấy được giá${data?.error ? ` (${esc(data.error)})` : ''}. Hệ thống sẽ thử lại ở lần cập nhật sau.</p>`;
-  } else {
-    const rows = data.items
-      .map((i) => {
-        const r = refPrices[i.key] || [];
-        return `<tr class="${state.changed.has(i.key) ? 'flash' : ''}">
-          <th scope="row">${esc(i.name)}</th>
-          ${priceCell('Mua', i.buy, r[0])}
-          ${priceCell('Bán', i.sell, r[1])}
-        </tr>`;
-      })
-      .join('');
-    body = `<div class="table-wrap"><table class="table shop-table">
-      <thead><tr><th>Loại vàng</th><th class="num">Mua vào</th><th class="num">Bán ra</th></tr></thead>
-      <tbody>${rows}</tbody></table></div>`;
-    if (data.note) body += `<p class="legend">${esc(data.note)}</p>`;
-  }
-
-  $('#shop-dialog-body').innerHTML = `
-    <header class="dialog-head">
-      <div>
-        <h2 id="shop-dialog-title">${esc(shop.name)} ${badges}</h2>
-        <p class="muted small">${esc(sub)}</p>
-      </div>
-      <button type="button" class="btn btn-ghost icon" data-close-dialog aria-label="Đóng">✕</button>
-    </header>
-    <div class="sheet-body">
-      ${data?.ok ? `<p class="meta">${sourceMeta(data)}</p>` : ''}
-      ${body}
-      <p class="legend">Đơn vị: <b>${unitLabel()}</b>. ${refNote()}
-        <a href="${esc(shop.website)}" target="_blank" rel="noopener">Xem trên website ${esc(shop.name)} ↗</a></p>
-    </div>`;
 }
 
 function renderFx() {
@@ -551,8 +439,7 @@ function renderSources() {
   $('#sources').innerHTML =
     `Nguồn giá: ${links.join(', ')}. DOJI, Bảo Tín Minh Châu và SJC chặn truy cập từ nước ngoài nên được lấy qua ` +
     `<a href="https://giavang.org" target="_blank" rel="noopener">giavang.org</a>. ` +
-    `Tỉ giá: <a href="https://www.vietcombank.com.vn/vi-VN/KHCN/Cong-cu-Tien-ich/Ty-gia" target="_blank" rel="noopener">Vietcombank</a>. ` +
-    `Giá thế giới: <a href="https://gold-api.com" target="_blank" rel="noopener">gold-api.com</a>.` +
+    `Tỉ giá: <a href="https://www.vietcombank.com.vn/vi-VN/KHCN/Cong-cu-Tien-ich/Ty-gia" target="_blank" rel="noopener">Vietcombank</a>.` +
     (state.snapshot?.generatedAt ? ` Máy chủ tổng hợp lúc ${fmtTime(state.snapshot.generatedAt)}.` : '');
 }
 
@@ -602,11 +489,11 @@ function notify(view, changed) {
   if (!settings.notify || !canNotify() || Notification.permission !== 'granted') return;
   if (settings.notifyOnlyChange && !changed) return;
   const lines = SHOPS.map((s) => {
-    const item = pick(view.gold[s.id], COMPARE.sjc.match) || (view.gold[s.id]?.ok ? view.gold[s.id].items[0] : null);
+    const item = sjcItem(view.gold[s.id]);
     return item ? `${s.name}: ${fmtMillions(item.buy)} / ${fmtMillions(item.sell)}` : null;
   }).filter(Boolean);
   const title = `Giá vàng lúc ${fmtTime(new Date().toISOString(), false)}${changed ? ' – có thay đổi' : ''}`;
-  showNotification(title, `Mua / bán (đ/lượng)\n${lines.join('\n')}`);
+  showNotification(title, `Vàng miếng SJC – mua / bán (đ/lượng)\n${lines.join('\n')}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -723,30 +610,9 @@ function setupControls() {
     });
   });
 
-  // Table rows and tabs are re-rendered, so listen on the document.
+  // The schedule line is re-rendered, so listen on the document.
   document.addEventListener('click', (e) => {
-    if (e.target.closest('a')) return;
-    const shop = e.target.closest('[data-shop]');
-    if (shop) return openShop(shop.dataset.shop);
-    const cmp = e.target.closest('[data-compare]');
-    if (cmp) {
-      settings.compare = cmp.dataset.compare;
-      saveSettings();
-      renderCompareTabs();
-      renderSummary();
-      renderCompare();
-      return;
-    }
-    if (e.target.closest('[data-open-settings]')) return openSettings();
-    if (e.target.closest('[data-close-dialog]')) $('#shop-dialog').close();
-  });
-
-  // A click on the backdrop (outside the sheet) closes the price board.
-  $('#shop-dialog').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) e.currentTarget.close();
-  });
-  $('#shop-dialog').addEventListener('close', () => {
-    state.openShop = null;
+    if (e.target.closest('[data-open-settings]')) openSettings();
   });
 
   document.addEventListener('visibilitychange', () => {
